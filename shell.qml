@@ -1,10 +1,19 @@
 import QtQuick
 import Quickshell
+import Quickshell.Hyprland
+import Quickshell.Io
 import Quickshell.Services.Mpris
+import Quickshell.Wayland
 import IslandBackend
 
 PanelWindow {
     id: root
+    property string overviewPhase: "closed"
+    readonly property bool overviewPreparing: overviewPhase === "preparing"
+    readonly property bool overviewVisible: overviewPhase === "opening" || overviewPhase === "open"
+    readonly property bool overviewContentVisible: overviewPhase === "open"
+    readonly property bool overviewLoaderActive: overviewPhase !== "closed"
+
     UserConfig {
         id: userConfig
     }
@@ -12,11 +21,86 @@ PanelWindow {
     color: "transparent"
     anchors { top: true; left: true; right: true }
     mask: Region { item: mainCapsule }
-    implicitHeight: 360
+    implicitHeight: (root.overviewVisible || root.overviewPreparing)
+        ? Math.max(360, Math.ceil(4 + root.overviewCapsuleHeight + 8))
+        : 360
     exclusiveZone: 45
+    aboveWindows: true
+    focusable: root.overviewVisible
+    WlrLayershell.layer: WlrLayer.Top
+    WlrLayershell.keyboardFocus: root.overviewVisible ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
     readonly property string iconFontFamily: "JetBrainsMono Nerd Font"
     readonly property string textFontFamily: "Inter"
     readonly property string heroFontFamily: "Inter Display"
+    readonly property real overviewCapsuleWidth: islandContainer.overviewView ? islandContainer.overviewView.width : 760
+    readonly property real overviewCapsuleHeight: islandContainer.overviewView ? islandContainer.overviewView.height : 308
+    readonly property real overviewCapsuleRadius: islandContainer.overviewView
+        ? islandContainer.overviewView.largeWorkspaceRadius + islandContainer.overviewView.outerPadding
+        : 44
+    readonly property color overviewCapsuleColor: islandContainer.overviewView
+        ? islandContainer.overviewView.cardColor
+        : "#ee17181b"
+    readonly property color overviewCapsuleBorderColor: islandContainer.overviewView
+        ? islandContainer.overviewView.cardBorderColor
+        : "#33ffffff"
+
+    IpcHandler {
+        target: "overview"
+
+        function toggle() {
+            if (root.overviewLoaderActive) root.closeOverview();
+            else root.openOverview();
+        }
+
+        function open() {
+            root.openOverview();
+        }
+
+        function close() {
+            root.closeOverview();
+        }
+    }
+
+    function beginOverviewOpening() {
+        if (!overviewPreparing) return;
+        overviewPhase = "opening";
+        overviewRevealTimer.restart();
+    }
+
+    function openOverview() {
+        if (overviewLoaderActive) return;
+        overviewPhase = "preparing";
+        if (overviewLoader.status === Loader.Ready) {
+            beginOverviewOpening();
+        }
+    }
+
+    function closeOverview() {
+        if (!overviewLoaderActive) return;
+        overviewRevealTimer.stop();
+        islandContainer.restoreRestingCapsule(true);
+        overviewPhase = "closed";
+    }
+
+    onOverviewVisibleChanged: {
+        if (overviewVisible) overviewFocusTimer.restart();
+    }
+
+    Timer {
+        id: overviewFocusTimer
+        interval: 0
+        repeat: false
+        onTriggered: islandContainer.forceActiveFocus()
+    }
+
+    Timer {
+        id: overviewRevealTimer
+        interval: 400
+        repeat: false
+        onTriggered: {
+            if (root.overviewPhase === "opening") root.overviewPhase = "open";
+        }
+    }
 
     // --- 基础时钟引擎 ---
     QtObject {
@@ -51,9 +135,10 @@ PanelWindow {
     }
 
     // --- 灵动岛主容器与全局状态 ---
-    Item {
+    FocusScope {
         id: islandContainer
         anchors.fill: parent
+        focus: root.overviewVisible
 
         property string islandState: "normal"
         property string splitIcon: userConfig.statusIcons["default"]
@@ -88,6 +173,9 @@ PanelWindow {
             || islandState === "lyrics"
             || (islandState === "long_capsule" && !workspaceFromLyricsMode)
         readonly property string lyricsDisplayText: lyricsBridge.displayText
+        readonly property var overviewView: overviewLoader.item && overviewLoader.item.overviewView
+            ? overviewLoader.item.overviewView
+            : null
 
         Behavior on osdProgress {
             enabled: islandContainer.osdProgressAnimationEnabled
@@ -98,6 +186,21 @@ PanelWindow {
             NumberAnimation {
                 duration: capsuleMouseArea.pressed ? 0 : islandContainer.swipeAnimationDuration
                 easing.type: Easing.OutCubic
+            }
+        }
+
+        Keys.onPressed: (event) => {
+            if (!root.overviewVisible) return;
+
+            if (event.key === Qt.Key_Escape) {
+                root.closeOverview();
+                event.accepted = true;
+            } else if (event.key === Qt.Key_Left) {
+                Hyprland.dispatch("workspace r-1");
+                event.accepted = true;
+            } else if (event.key === Qt.Key_Right) {
+                Hyprland.dispatch("workspace r+1");
+                event.accepted = true;
             }
         }
 
@@ -145,8 +248,10 @@ PanelWindow {
             swipeSuppressReset.restart();
         }
 
-        function restoreRestingCapsule() {
-            if (islandState === "long_capsule" && workspaceFromLyricsMode && restingState === "lyrics") {
+        function restoreRestingCapsule(forceImmediate) {
+            if (forceImmediate === undefined) forceImmediate = false;
+
+            if (!forceImmediate && islandState === "long_capsule" && workspaceFromLyricsMode && restingState === "lyrics") {
                 clearTransientCapsule();
                 expandedByPlayerAutoOpen = false;
                 swipeTransitionProgress = 1;
@@ -489,16 +594,90 @@ PanelWindow {
         // --- UI 渲染：灵动岛主干 ---
         Rectangle {
             id: mainCapsule
-            color: "black"; y: 4; anchors.horizontalCenter: parent.horizontalCenter; clip: true
+            property real outlineWidth: root.overviewVisible ? 1 : 0
+            property color outlineColor: root.overviewVisible ? root.overviewCapsuleBorderColor : "#00000000"
+            readonly property real targetWidth: {
+                if (root.overviewVisible) return root.overviewCapsuleWidth;
+
+                switch (islandContainer.islandState) {
+                case "split":
+                    return islandContainer.splitCapsuleWidth;
+                case "long_capsule":
+                    return 220;
+                case "lyrics":
+                    return islandContainer.lyricsCapsuleWidth;
+                case "control_center":
+                    return 420;
+                case "expanded":
+                    return 400;
+                default:
+                    return 140;
+                }
+            }
+            readonly property real targetHeight: {
+                if (root.overviewVisible) return root.overviewCapsuleHeight;
+
+                switch (islandContainer.islandState) {
+                case "control_center":
+                    return 292;
+                case "expanded":
+                    return 165;
+                default:
+                    return 38;
+                }
+            }
+            readonly property real targetRadius: {
+                if (root.overviewVisible) return root.overviewCapsuleRadius;
+
+                switch (islandContainer.islandState) {
+                case "control_center":
+                    return 34;
+                case "expanded":
+                    return 40;
+                default:
+                    return 19;
+                }
+            }
+
+            color: root.overviewVisible ? root.overviewCapsuleColor : "black"
+            y: 4
+            anchors.horizontalCenter: parent.horizontalCenter
+            clip: true
+            width: targetWidth
+            height: targetHeight
+            radius: targetRadius
 
             Behavior on width  { NumberAnimation { duration: 400; easing.type: Easing.OutQuint } }
             Behavior on height { NumberAnimation { duration: 400; easing.type: Easing.OutQuint } }
             Behavior on radius { NumberAnimation { duration: 400; easing.type: Easing.OutQuint } }
+            Behavior on color { ColorAnimation { duration: 280; easing.type: Easing.InOutQuad } }
+            Behavior on outlineWidth { NumberAnimation { duration: 260; easing.type: Easing.InOutQuad } }
+            Behavior on outlineColor { ColorAnimation { duration: 260; easing.type: Easing.InOutQuad } }
+            border.width: outlineWidth
+            border.color: outlineColor
+
+            Rectangle {
+                anchors.fill: parent
+                anchors.margins: 1
+                radius: Math.max(parent.radius - 1, 0)
+                color: "transparent"
+                border.width: 1
+                border.color: "#12ffffff"
+                opacity: root.overviewVisible ? 1 : 0
+
+                Behavior on opacity {
+                    NumberAnimation {
+                        duration: root.overviewVisible ? 260 : 140
+                        easing.type: Easing.InOutQuad
+                    }
+                }
+            }
 
             MouseArea {
                 id: capsuleMouseArea
                 anchors.fill: parent
                 z: -1
+                enabled: !root.overviewVisible
                 acceptedButtons: Qt.LeftButton | Qt.RightButton
                 preventStealing: true
                 property real swipeStartX: 0
@@ -601,10 +780,12 @@ PanelWindow {
                 maximumWidth: Math.max(220, root.width - 48)
                 transitionProgress: islandContainer.swipeTransitionProgress
                 showSecondaryText: !islandContainer.workspaceFromLyricsMode
-                showCondition: islandContainer.islandState === "normal"
+                showCondition: !root.overviewVisible && (
+                    islandContainer.islandState === "normal"
                     || islandContainer.islandState === "lyrics"
                     || (islandContainer.islandState === "long_capsule"
                         && (islandContainer.workspaceFromLyricsMode || islandContainer.swipeTransitionProgress > 0))
+                )
                 onPreferredWidthChanged: {
                     if (islandContainer.islandState === "lyrics") islandContainer.syncLyricsCapsuleWidth();
                 }
@@ -613,7 +794,7 @@ PanelWindow {
             SplitIconLayer {
                 iconText: islandContainer.splitIcon
                 iconFontFamily: root.iconFontFamily
-                showCondition: islandContainer.splitShowsIconOnly
+                showCondition: !root.overviewVisible && islandContainer.splitShowsIconOnly
             }
 
             OsdLayer {
@@ -623,7 +804,7 @@ PanelWindow {
                 iconFontFamily: root.iconFontFamily
                 textFontFamily: root.textFontFamily
                 heroFontFamily: root.heroFontFamily
-                showCondition: islandContainer.splitUsesExtendedLayout
+                showCondition: !root.overviewVisible && islandContainer.splitUsesExtendedLayout
             }
 
             WorkspaceLayer {
@@ -633,7 +814,8 @@ PanelWindow {
                 textPixelSize: 16
                 animateVisibility: islandContainer.restingState !== "lyrics"
                 transitionProgress: islandContainer.swipeTransitionProgress
-                showCondition: islandContainer.islandState === "long_capsule"
+                showCondition: !root.overviewVisible
+                    && islandContainer.islandState === "long_capsule"
                     && (islandContainer.workspaceFromLyricsMode || islandContainer.swipeTransitionProgress < 0.001)
                 slideFromLyrics: islandContainer.workspaceFromLyricsMode
             }
@@ -648,7 +830,7 @@ PanelWindow {
                 activePlayer: islandContainer.activePlayer
                 iconFontFamily: root.iconFontFamily
                 textFontFamily: root.textFontFamily
-                showCondition: islandContainer.islandState === "expanded"
+                showCondition: !root.overviewVisible && islandContainer.islandState === "expanded"
                 onControlPressed: islandContainer.suppressCapsuleClick()
             }
 
@@ -665,18 +847,52 @@ PanelWindow {
                 currentWorkspace: islandContainer.currentWs
                 currentTrack: islandContainer.currentTrack
                 currentArtist: islandContainer.currentArtist
-                showCondition: islandContainer.islandState === "control_center"
+                showCondition: !root.overviewVisible && islandContainer.islandState === "control_center"
+            }
+
+            Loader {
+                id: overviewLoader
+
+                anchors.fill: parent
+                active: root.overviewLoaderActive
+                asynchronous: false
+                visible: root.overviewContentVisible
+
+                onStatusChanged: {
+                    if (status === Loader.Ready && root.overviewPreparing) {
+                        root.beginOverviewOpening();
+                    }
+                }
+
+                sourceComponent: Component {
+                    Item {
+                        id: overviewScene
+
+                        property alias overviewView: overviewView
+
+                        anchors.fill: parent
+
+                        HyprlandData {
+                            id: hyprlandData
+                        }
+
+                        WorkspaceOverviewLayer {
+                            id: overviewView
+
+                            anchors.centerIn: parent
+                            screen: root.screen
+                            hyprlandData: hyprlandData
+                            showCondition: root.overviewVisible
+                            textFontFamily: root.textFontFamily
+                            heroFontFamily: root.heroFontFamily
+                            wallpaperPath: userConfig.wallpaperPath
+                            windowCornerRadius: userConfig.workspaceOverviewWindowRadius
+                            onCloseRequested: root.closeOverview()
+                        }
+                    }
+                }
             }
 
         }
-
-        states: [
-            State { name: "normal";        when: islandContainer.islandState === "normal";         PropertyChanges { target: mainCapsule; width: 140; height: 38; radius: 19 } },
-            State { name: "split";         when: islandContainer.islandState === "split";          PropertyChanges { target: mainCapsule; width: islandContainer.splitCapsuleWidth; height: 38; radius: 19 } },
-            State { name: "long_capsule"; when: islandContainer.islandState === "long_capsule";   PropertyChanges { target: mainCapsule; width: 220; height: 38; radius: 19 } },
-            State { name: "lyrics";       when: islandContainer.islandState === "lyrics";         PropertyChanges { target: mainCapsule; width: islandContainer.lyricsCapsuleWidth; height: 38; radius: 19 } },
-            State { name: "control_center"; when: islandContainer.islandState === "control_center"; PropertyChanges { target: mainCapsule; width: 420; height: 292; radius: 34 } },
-            State { name: "expanded";      when: islandContainer.islandState === "expanded";       PropertyChanges { target: mainCapsule; width: 400; height: 165; radius: 40 } }
-        ]
     }
 }

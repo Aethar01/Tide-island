@@ -3,11 +3,14 @@ import QtQuick
 QtObject {
     id: userConfig
 
+    property string wallpaperPath: "/home/dan/.config/hypr/wallpaper.png"
+    property real workspaceOverviewWindowRadius: 12
+
     property var scriptPaths: ({
-        button_1: "~/.config/quickshell/wifi-menu.sh",
-        button_2: "~/.config/quickshell/bluetooth-menu.sh",
-        button_3: "~/.config/quickshell/wallpaper-switch.sh",
-        button_4: "~/.config/quickshell/powermenu"
+        button_1: "/home/dan/.local/bin/quickshell_script/wifi-menu.sh",
+        button_2: "/home/dan/.local/bin/quickshell_script/bluetooth-menu.sh",
+        button_3: "/home/dan/.local/bin/quickshell_script/wallpaper-switch.sh",
+        button_4: "/home/dan/.local/bin/quickshell_script/powermenu"
     })
 
     property var controlCenterActions: ([
