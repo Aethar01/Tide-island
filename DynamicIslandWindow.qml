@@ -1835,63 +1835,6 @@ PanelWindow {
                 }
             }
 
-            WheelHandler {
-                id: trackpadSwipeHandler
-                target: mainCapsule
-                
-                property real accumulatedDelta: 0
-                property real swipeStartProgress: 0
-
-                onActiveChanged: {
-                    if (active) {
-                        swipeStartProgress = islandContainer.swipeTransitionProgress;
-                        accumulatedDelta = 0;
-                        islandContainer.cancelSideSwipeSettle();
-                    } else {
-                        const settleResult = islandContainer.resolveSideSwipeSettle(
-                            swipeStartProgress,
-                            islandContainer.swipeTransitionProgress
-                        );
-
-                        islandContainer.beginSideSwipeSettle(settleResult.width);
-
-                        switch (settleResult.action) {
-                        case "time":
-                            islandContainer.showTimeCapsule();
-                            break;
-                        case "custom":
-                            islandContainer.showCustomCapsule();
-                            break;
-                        case "lyrics":
-                            islandContainer.showLyricsCapsule();
-                            break;
-                        default:
-                            islandContainer.swipeTransitionProgress = settleResult.progress;
-                        }
-                    }
-                }
-
-                onWheel: (event) => {
-                    const dx = event.pixelDelta.x !== 0 ? event.pixelDelta.x : event.angleDelta.x / 4;
-                    const dy = event.pixelDelta.y !== 0 ? event.pixelDelta.y : event.angleDelta.y / 4;
-                    
-                    console.debug("[Wheel Debug] dx:", dx, "dy:", dy, "accumulated:", accumulatedDelta);
-
-                    const effectiveDx = Math.abs(dx) > Math.abs(dy) ? dx : dy;
-                    const sensitivity = 5.0; 
-                    accumulatedDelta += effectiveDx * sensitivity;
-                    
-                    const logicalDeltaX = -accumulatedDelta;
-                    const nextProgress = islandContainer.advanceSideSwipeProgress(
-                        swipeStartProgress,
-                        logicalDeltaX
-                    );
-
-                    islandContainer.swipeTransitionProgress = nextProgress;
-                    mainCapsule.displayedWidth = mainCapsule.sideSwipePreviewWidth;
-                    event.accepted = true;
-                }
-            }
 
             MouseArea {
                 id: capsuleMouseArea
@@ -2118,6 +2061,49 @@ PanelWindow {
                         islandContainer.swipeTransitionProgress = islandContainer.sideSwipeRestProgressForProgress(swipeStartProgress);
                     }
                     swipeMoved = false;
+                }
+            }
+
+            // [TRACKPAD FIX] Placing this at the very end so it's on top of everything
+            WheelHandler {
+                id: trackpadSwipeHandler
+                
+                property real accumulatedDelta: 0
+                property real swipeStartProgress: 0
+
+                onActiveChanged: {
+                    if (active) {
+                        swipeStartProgress = islandContainer.swipeTransitionProgress;
+                        accumulatedDelta = 0;
+                        islandContainer.cancelSideSwipeSettle();
+                        console.debug("!!! [TRACKPAD] SWIPE STARTED !!!");
+                    } else {
+                        const settleResult = islandContainer.resolveSideSwipeSettle(
+                            swipeStartProgress,
+                            islandContainer.swipeTransitionProgress
+                        );
+                        islandContainer.beginSideSwipeSettle(settleResult.width);
+                        console.debug("!!! [TRACKPAD] SWIPE RELEASED - SETTLING TO:", settleResult.action);
+
+                        switch (settleResult.action) {
+                        case "time": islandContainer.showTimeCapsule(); break;
+                        case "custom": islandContainer.showCustomCapsule(); break;
+                        case "lyrics": islandContainer.showLyricsCapsule(); break;
+                        default: islandContainer.swipeTransitionProgress = settleResult.progress;
+                        }
+                    }
+                }
+
+                onWheel: (event) => {
+                    const dx = event.pixelDelta.x !== 0 ? event.pixelDelta.x : event.angleDelta.x / 4;
+                    const dy = event.pixelDelta.y !== 0 ? event.pixelDelta.y : event.angleDelta.y / 4;
+                    const effectiveDx = Math.abs(dx) > Math.abs(dy) ? dx : dy;
+                    
+                    accumulatedDelta += effectiveDx * 8.0; // Mega sensitivity
+                    const nextProgress = islandContainer.advanceSideSwipeProgress(swipeStartProgress, -accumulatedDelta);
+                    islandContainer.swipeTransitionProgress = nextProgress;
+                    mainCapsule.displayedWidth = mainCapsule.sideSwipePreviewWidth;
+                    event.accepted = true;
                 }
             }
 
