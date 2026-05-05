@@ -543,6 +543,7 @@ QString SysBackend::findLyricsBackendExecutable() const {
         quickshellConfigDir + "/bin/lyricsmpris",
         homeDir + "/.local/bin/lyricsmpris",
         homeDir + "/.cargo/bin/lyricsmpris",
+        "/usr/share/tide-island/bin/lyricsmpris",
         pathExecutable
     };
 
