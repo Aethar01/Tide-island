@@ -2058,48 +2058,6 @@ PanelWindow {
                 }
             }
 
-            // [TRACKPAD FIX] Placing this at the very end so it's on top of everything
-            WheelHandler {
-                id: trackpadSwipeHandler
-                
-                property real accumulatedDelta: 0
-                property real swipeStartProgress: 0
-
-                onActiveChanged: {
-                    if (active) {
-                        swipeStartProgress = islandContainer.swipeTransitionProgress;
-                        accumulatedDelta = 0;
-                        islandContainer.cancelSideSwipeSettle();
-                        console.debug("!!! [TRACKPAD] SWIPE STARTED !!!");
-                    } else {
-                        const settleResult = islandContainer.resolveSideSwipeSettle(
-                            swipeStartProgress,
-                            islandContainer.swipeTransitionProgress
-                        );
-                        islandContainer.beginSideSwipeSettle(settleResult.width);
-                        console.debug("!!! [TRACKPAD] SWIPE RELEASED - SETTLING TO:", settleResult.action);
-
-                        switch (settleResult.action) {
-                        case "time": islandContainer.showTimeCapsule(); break;
-                        case "custom": islandContainer.showCustomCapsule(); break;
-                        case "lyrics": islandContainer.showLyricsCapsule(); break;
-                        default: islandContainer.swipeTransitionProgress = settleResult.progress;
-                        }
-                    }
-                }
-
-                onWheel: (event) => {
-                    const dx = event.pixelDelta.x !== 0 ? event.pixelDelta.x : event.angleDelta.x / 4;
-                    const dy = event.pixelDelta.y !== 0 ? event.pixelDelta.y : event.angleDelta.y / 4;
-                    const effectiveDx = Math.abs(dx) > Math.abs(dy) ? dx : dy;
-                    
-                    accumulatedDelta += effectiveDx * 8.0; // Mega sensitivity
-                    const nextProgress = islandContainer.advanceSideSwipeProgress(swipeStartProgress, -accumulatedDelta);
-                    islandContainer.swipeTransitionProgress = nextProgress;
-                    mainCapsule.displayedWidth = mainCapsule.sideSwipePreviewWidth;
-                    event.accepted = true;
-                }
-            }
 
 
             Loader {
@@ -2496,6 +2454,64 @@ PanelWindow {
                             heroFontFamily: root.heroFontFamily
                             presentationProgress: bluetoothConnectivityDetailShell.revealProgress
                         }
+                    }
+                }
+            }
+        }
+    }
+
+    // [ROOT GESTURE CAPTURE]
+    MouseArea {
+        id: rootGestureArea
+        anchors.fill: parent
+        hoverEnabled: false
+        acceptedButtons: Qt.NoButton 
+        
+        property real accumulatedDelta: 0
+        property real swipeStartProgress: 0
+        property bool isSwiping: false
+        
+        onWheel: (wheel) => {
+            console.debug("[ROOT PING] Wheel Event Detected!");
+
+            if (!isSwiping) {
+                isSwiping = true;
+                swipeStartProgress = islandContainer.swipeTransitionProgress;
+                accumulatedDelta = 0;
+                islandContainer.cancelSideSwipeSettle();
+            }
+
+            const dx = wheel.pixelDelta.x !== 0 ? wheel.pixelDelta.x : wheel.angleDelta.x / 4;
+            const dy = wheel.pixelDelta.y !== 0 ? wheel.pixelDelta.y : wheel.angleDelta.y / 4;
+            const effectiveDx = Math.abs(dx) > Math.abs(dy) ? dx : dy;
+            
+            accumulatedDelta += (effectiveDx * 5.0);
+            
+            const nextProgress = islandContainer.advanceSideSwipeProgress(swipeStartProgress, -accumulatedDelta);
+            islandContainer.swipeTransitionProgress = nextProgress;
+            mainCapsule.displayedWidth = mainCapsule.sideSwipePreviewWidth;
+            
+            swipeSettleTimer.restart();
+            wheel.accepted = false; 
+        }
+
+        Timer {
+            id: swipeSettleTimer
+            interval: 150
+            onTriggered: {
+                if (rootGestureArea.isSwiping) {
+                    rootGestureArea.isSwiping = false;
+                    const settleResult = islandContainer.resolveSideSwipeSettle(
+                        rootGestureArea.swipeStartProgress,
+                        islandContainer.swipeTransitionProgress
+                    );
+                    islandContainer.beginSideSwipeSettle(settleResult.width);
+                    
+                    switch (settleResult.action) {
+                    case "time": islandContainer.showTimeCapsule(); break;
+                    case "custom": islandContainer.showCustomCapsule(); break;
+                    case "lyrics": islandContainer.showLyricsCapsule(); break;
+                    default: islandContainer.swipeTransitionProgress = settleResult.progress;
                     }
                 }
             }
