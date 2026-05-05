@@ -8,15 +8,12 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
-# Ensure plugins can find libraries in the same directory
-set(CMAKE_INSTALL_RPATH "$ORIGIN")
-set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
-
 find_package(Qt6 REQUIRED COMPONENTS Core Qml Network DBus)
 find_library(UDEV_LIB NAMES udev REQUIRED)
 
 # IslandBackend Module
 qt_add_qml_module(IslandBackend
+    STATIC
     URI IslandBackend
     VERSION 1.0
     SOURCES
@@ -43,7 +40,7 @@ file(GLOB QML_FILES "*.qml")
 install(FILES ${QML_FILES} DESTINATION ${CMAKE_INSTALL_DATADIR}/tide-island)
 
 # Install IslandBackend module to Qt6 QML directory
-install(TARGETS IslandBackend IslandBackendplugin
+install(TARGETS IslandBackendplugin
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}/qt6/qml/IslandBackend
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
