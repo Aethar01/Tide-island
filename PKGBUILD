@@ -1,7 +1,7 @@
 # Maintainer: whysooraj <whysooraj.official@gmail.com>
 pkgname=tide-island-git
 _pkgname=Tide-island
-pkgver=r200.a0652ba
+pkgver=r203.aecf321
 pkgrel=1
 pkgdesc="A dynamic island for Hyprland using Quickshell"
 arch=('x86_64')
@@ -33,10 +33,10 @@ conflicts=('tide-island')
 install='tide-island.install'
 # We'll use the local files directly during the build function
 source=()
-sha256sums=('SKIP')
+sha256sums=()
 
 pkgver() {
-  cd "$_pkgname"
+  cd "${startdir}"
   printf "r%s.%s" "$(git rev-list --count HEAD)" "$(git rev-parse --short HEAD)"
 }
 

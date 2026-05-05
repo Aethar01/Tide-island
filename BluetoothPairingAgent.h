@@ -15,6 +15,7 @@ class BluetoothPairingAgent final : public QObject, protected QDBusContext {
     Q_OBJECT
     QML_ELEMENT
     QML_SINGLETON
+    QML_UNCREATABLE("Singleton")
     Q_CLASSINFO("D-Bus Interface", "org.bluez.Agent1")
 
     Q_PROPERTY(bool registered READ registered NOTIFY registeredChanged)
