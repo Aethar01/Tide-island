@@ -178,4 +178,4 @@ The default configuration is located at `/usr/share/tide-island/UserConfig.qml`.
 ## Join the community
 - Discord: https://discord.gg/gEmqgz76
 
-- Gmail: whysooraj.official@gmail.com
+- Gmail: enhaoswen@gmail.com
