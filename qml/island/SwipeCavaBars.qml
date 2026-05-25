@@ -4,7 +4,7 @@ Item {
     id: root
 
     property var levels: [0, 0, 0, 0, 0, 0, 0, 0]
-    property int barCount: Math.max(1, levels.length > 0 ? levels.length : 8)
+    property int barCount: Math.max(1, levelCount() > 0 ? levelCount() : 8)
     property real barWidth: 4
     property real barSpacing: 3
     property real minimumBarHeight: 4
@@ -15,6 +15,21 @@ Item {
     width: implicitWidth
     height: implicitHeight
 
+    function levelCount() {
+        if (!levels)
+            return 0;
+
+        const count = Number(levels.length);
+        return isFinite(count) && count > 0 ? Math.floor(count) : 0;
+    }
+
+    function levelAt(index) {
+        if (!levels || index < 0 || index >= levelCount())
+            return 0;
+
+        return Number(levels[index]);
+    }
+
     Row {
         anchors.fill: parent
         spacing: root.barSpacing
@@ -23,10 +38,7 @@ Item {
             model: root.barCount
 
             delegate: Rectangle {
-                readonly property real rawLevel: {
-                    if (!Array.isArray(root.levels) || index >= root.levels.length) return 0;
-                    return Number(root.levels[index]);
-                }
+                readonly property real rawLevel: root.levelAt(index)
                 readonly property real clampedLevel: Math.max(0, Math.min(1, isNaN(rawLevel) ? 0 : rawLevel))
 
                 width: root.barWidth
