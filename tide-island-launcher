@@ -5,10 +5,4 @@
 # shell.qml so Hyprland's `qs ipc -p /usr/share/tide-island ...` targets the
 # same Quickshell instance.
 QML_PATH="/usr/share/tide-island"
-SETUP_HELPER="$QML_PATH/bin/tide-island-setup"
-
-if [[ -x "$SETUP_HELPER" && -z "${TIDE_ISLAND_SKIP_SETUP:-}" ]]; then
-  "$SETUP_HELPER" --launch >/dev/null 2>&1 || true
-fi
-
 exec quickshell -p "$QML_PATH" "$@"
