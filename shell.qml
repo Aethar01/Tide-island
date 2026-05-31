@@ -86,6 +86,14 @@ Scope {
         }
     }
 
+	IpcHandler {
+        target: "bar"
+        function toggle() {
+            root.visible = !root.visible
+        }
+    }
+
+
     GlobalShortcut {
         appid: userConfig.overviewGlobalShortcutAppid
         name: userConfig.overviewGlobalShortcutName
