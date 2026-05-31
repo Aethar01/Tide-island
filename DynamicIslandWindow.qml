@@ -90,7 +90,7 @@ PanelWindow {
             Math.ceil(root.controlCenterWindowHeight)
         )
         : Math.max(Math.ceil(4 + root.connectivityDetailHeight + 12), Math.ceil(root.controlCenterWindowHeight))
-    exclusiveZone: root.controlCenterOverlayMode && islandContainer.overlayActive ? 0 : 45
+    exclusiveZone: root.controlCenterOverlayMode ? 0 : 45
     aboveWindows: true
     focusable: root.monitorFocused && (root.overviewVisible || root.connectivityPromptActive)
     WlrLayershell.layer: WlrLayer.Top
