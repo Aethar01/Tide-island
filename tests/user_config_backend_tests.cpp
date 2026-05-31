@@ -41,6 +41,7 @@ void UserConfigBackendTests::loadsTypedValuesFromJson()
         "textFontFamily": "Test Text",
         "tlpPermissionMode": "skip",
         "showControlCenterBattery": false,
+        "controlCenterItems": ["tray", "wifi", "volume"],
         "dynamicIslandLeftSwipeItems": ["time", "ram"]
     })json");
     QVERIFY(!configPath.isEmpty());
@@ -52,6 +53,7 @@ void UserConfigBackendTests::loadsTypedValuesFromJson()
     QCOMPARE(config.textFontFamily(), QStringLiteral("Test Text"));
     QCOMPARE(config.tlpPermissionMode(), QStringLiteral("skip"));
     QCOMPARE(config.showControlCenterBattery(), false);
+    QCOMPARE(config.controlCenterItems(), QVariantList({QStringLiteral("tray"), QStringLiteral("wifi"), QStringLiteral("volume")}));
     QCOMPARE(config.dynamicIslandLeftSwipeItems(), QVariantList({QStringLiteral("time"), QStringLiteral("ram")}));
 }
 
@@ -67,6 +69,7 @@ void UserConfigBackendTests::exposesParseErrorsAndFallsBackToDefaults()
     QVERIFY(!config.configError().isEmpty());
     QCOMPARE(config.textFontFamily(), QStringLiteral("Inter Display"));
     QCOMPARE(config.showControlCenterBattery(), true);
+    QCOMPARE(config.controlCenterItems(), QVariantList({QStringLiteral("tray"), QStringLiteral("wifi"), QStringLiteral("bluetooth"), QStringLiteral("tlp"), QStringLiteral("brightness"), QStringLiteral("volume")}));
     QCOMPARE(config.dynamicIslandLeftSwipeItems(), QVariantList({QStringLiteral("cava"), QStringLiteral("battery")}));
 }
 

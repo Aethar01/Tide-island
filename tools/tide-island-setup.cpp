@@ -122,6 +122,7 @@ QJsonObject defaultUserConfig()
         {QStringLiteral("overviewGlobalShortcutAppid"), QStringLiteral("quickshell")},
         {QStringLiteral("overviewGlobalShortcutName"), QStringLiteral("dynamic-island-overview")},
         {QStringLiteral("showControlCenterBattery"), true},
+        {QStringLiteral("controlCenterItems"), stringArray({QStringLiteral("tray"), QStringLiteral("wifi"), QStringLiteral("bluetooth"), QStringLiteral("tlp"), QStringLiteral("brightness"), QStringLiteral("volume")})},
         {QStringLiteral("workspaceOverviewWindowDragButton"), 1},
         {QStringLiteral("dynamicIslandPrimaryButton"), 1},
         {QStringLiteral("dynamicIslandPrimaryAction"), QStringLiteral("toggleExpandedPlayer")},

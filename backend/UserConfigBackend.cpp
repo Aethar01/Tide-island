@@ -19,6 +19,11 @@ QVariantList defaultDynamicIslandLeftSwipeItems()
     return {QStringLiteral("cava"), QStringLiteral("battery")};
 }
 
+QVariantList defaultControlCenterItems()
+{
+    return {QStringLiteral("tray"), QStringLiteral("wifi"), QStringLiteral("bluetooth"), QStringLiteral("tlp"), QStringLiteral("brightness"), QStringLiteral("volume")};
+}
+
 QString jsonString(const QJsonObject &object, QLatin1String key, const QString &fallback)
 {
     const QJsonValue value = object.value(key);
@@ -61,6 +66,7 @@ void updateField(Owner *owner, T &field, T nextValue, Signal signal)
 UserConfigBackend::UserConfigBackend(QObject *parent)
     : QObject(parent)
     , m_userConfigPath(configHome() + QStringLiteral("/tide-island/userconfig.json"))
+    , m_controlCenterItems(defaultControlCenterItems())
     , m_dynamicIslandLeftSwipeItems(defaultDynamicIslandLeftSwipeItems())
 {
     m_reloadTimer.setSingleShot(true);
@@ -141,6 +147,11 @@ QString UserConfigBackend::overviewGlobalShortcutName() const
 bool UserConfigBackend::showControlCenterBattery() const
 {
     return m_showControlCenterBattery;
+}
+
+const QVariantList &UserConfigBackend::controlCenterItems() const
+{
+    return m_controlCenterItems;
 }
 
 int UserConfigBackend::workspaceOverviewWindowDragButton() const
@@ -281,6 +292,7 @@ void UserConfigBackend::loadConfig()
     updateField(this, m_overviewGlobalShortcutAppid, jsonString(configObject, QLatin1String("overviewGlobalShortcutAppid"), QStringLiteral("quickshell")), &UserConfigBackend::overviewGlobalShortcutAppidChanged);
     updateField(this, m_overviewGlobalShortcutName, jsonString(configObject, QLatin1String("overviewGlobalShortcutName"), QStringLiteral("dynamic-island-overview")), &UserConfigBackend::overviewGlobalShortcutNameChanged);
     updateField(this, m_showControlCenterBattery, jsonBool(configObject, QLatin1String("showControlCenterBattery"), true), &UserConfigBackend::showControlCenterBatteryChanged);
+    updateField(this, m_controlCenterItems, jsonArray(configObject, QLatin1String("controlCenterItems"), defaultControlCenterItems()), &UserConfigBackend::controlCenterItemsChanged);
     updateField(this, m_workspaceOverviewWindowDragButton, jsonInt(configObject, QLatin1String("workspaceOverviewWindowDragButton"), 1), &UserConfigBackend::workspaceOverviewWindowDragButtonChanged);
     updateField(this, m_dynamicIslandPrimaryButton, jsonInt(configObject, QLatin1String("dynamicIslandPrimaryButton"), 1), &UserConfigBackend::dynamicIslandPrimaryButtonChanged);
     updateField(this, m_dynamicIslandPrimaryAction, jsonString(configObject, QLatin1String("dynamicIslandPrimaryAction"), QStringLiteral("toggleExpandedPlayer")), &UserConfigBackend::dynamicIslandPrimaryActionChanged);

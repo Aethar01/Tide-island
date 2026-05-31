@@ -10,17 +10,29 @@ Item {
     signal connectivityPanelRequested(string kind, bool open)
 
     readonly property var userConfig: UserConfig
+    readonly property var configuredItems: userConfig.controlCenterItems || []
     readonly property bool showHeaderBattery: userConfig.showControlCenterBattery !== false
-    property var menuParentWindow: null
-    readonly property bool showTray: true
-    readonly property bool headerTrayVisible: !showHeaderBattery && showTray
-    readonly property bool systemTrayVisible: showHeaderBattery && showTray
-    readonly property real systemTrayHeight: systemTrayVisible ? 34 : 0
+    readonly property bool showTray: hasControlCenterItem("tray")
+    readonly property bool showWifi: hasControlCenterItem("wifi")
+    readonly property bool showBluetooth: hasControlCenterItem("bluetooth")
+    readonly property bool showTlp: hasControlCenterItem("tlp")
+    readonly property bool showBrightness: hasControlCenterItem("brightness")
+    readonly property bool showVolume: hasControlCenterItem("volume")
+    readonly property var quickCardItems: orderedQuickCardItems()
+    readonly property bool showQuickCards: quickCardItems.length > 0
+    readonly property int configuredControlItemCount: (showTray ? 1 : 0)
+        + (showWifi ? 1 : 0)
+        + (showBluetooth ? 1 : 0)
+        + (showTlp ? 1 : 0)
+        + (showBrightness ? 1 : 0)
+        + (showVolume ? 1 : 0)
+    readonly property bool showDetailsDrawer: quickCardItems.length > 2
 
     property bool showCondition: false
     property string iconFontFamily: userConfig.iconFontFamily
     property string textFontFamily: userConfig.textFontFamily
     property string heroFontFamily: userConfig.heroFontFamily
+    property var menuParentWindow: null
     // ... rest of properties ...
 
     scale: showCondition ? 1.0 : 0.12
@@ -56,13 +68,13 @@ Item {
     property bool sliderIntroPending: false
     property bool wifiPanelOpen: false
     property bool bluetoothPanelOpen: false
-    property bool batteryDrawerOpen: false
-    property bool batteryDrawerDragging: false
-    property real batteryDrawerProgress: 0
-    property bool batteryDrawerSettling: false
-    readonly property bool batteryDrawerMoving: batteryDrawerDragging
-        || batteryDrawerSettling
-        || batteryDrawerProgressAnimation.running
+    property bool detailsDrawerOpen: false
+    property bool detailsDrawerDragging: false
+    property real detailsDrawerProgress: 0
+    property bool detailsDrawerSettling: false
+    readonly property bool detailsDrawerMoving: detailsDrawerDragging
+        || detailsDrawerSettling
+        || detailsDrawerProgressAnimation.running
     property bool batteryModeBusy: false
     property bool batteryModeStateRunning: false
     property bool batteryModeSetterRunning: false
@@ -111,13 +123,58 @@ Item {
     readonly property string brightnessIconGlyph: "\u{F00DF}"
     readonly property string volumeIconGlyph: "\u{F057E}"
     readonly property var batteryModeGlyphs: ["", "", ""]
-    readonly property real batteryDrawerHandleHeight: 20
-    readonly property real batteryDrawerContentGap: 8
+    readonly property real detailsDrawerHandleHeight: 20
+    readonly property real detailsDrawerContentGap: 8
     readonly property real batteryModeCardHeight: 80
-    readonly property real controlCenterExtraHeight: 12 + batteryDrawerHandleHeight
-        + batteryDrawerProgress * (batteryDrawerContentGap + batteryModeCardHeight)
-    readonly property real controlCenterMaximumExtraHeight: 12 + batteryDrawerHandleHeight
-        + batteryDrawerContentGap + batteryModeCardHeight
+    readonly property real batteryModeSlotWidth: 44
+    readonly property real sectionSpacing: 12
+    readonly property real headerHeight: 28
+    readonly property real connectivityHeight: 80
+    readonly property real sliderCardHeight: 76
+    readonly property bool headerTrayVisible: !showHeaderBattery && showTray && systemTrayRepeater.count > 0
+    readonly property real systemTrayHeight: systemTrayVisible ? 34 : 0
+    readonly property bool systemTrayVisible: showHeaderBattery && showTray && systemTrayRepeater.count > 0
+    readonly property real connectivitySectionHeight: showQuickCards ? connectivityHeight : 0
+    readonly property int connectivityItemCount: Math.min(2, quickCardItems.length)
+    readonly property int drawerItemCount: Math.max(0, quickCardItems.length - 2)
+    readonly property real quickCardWidth: connectivityItemCount > 0
+        ? (connectivityCardsRow.width - connectivityCardsRow.spacing * Math.max(0, connectivityItemCount - 1)) / connectivityItemCount
+        : 0
+    readonly property real drawerCardWidth: drawerItemCount > 0
+        ? (detailsDrawerContentRow.width - detailsDrawerContentRow.spacing * Math.max(0, drawerItemCount - 1)) / drawerItemCount
+        : 0
+    readonly property real detailsDrawerSectionHeight: showDetailsDrawer
+        ? detailsDrawerHandleHeight + detailsDrawerProgress * (detailsDrawerContentGap + connectivityHeight)
+        : 0
+    readonly property real detailsDrawerMaximumSectionHeight: showDetailsDrawer
+        ? detailsDrawerHandleHeight + detailsDrawerContentGap + connectivityHeight
+        : 0
+    readonly property real brightnessSectionHeight: showBrightness ? sliderCardHeight : 0
+    readonly property real volumeSectionHeight: showVolume ? sliderCardHeight : 0
+    readonly property int visibleSectionCount: 1
+        + (showQuickCards ? 1 : 0)
+        + (showDetailsDrawer ? 1 : 0)
+        + (showBrightness ? 1 : 0)
+        + (showVolume ? 1 : 0)
+        + (systemTrayVisible ? 1 : 0)
+    readonly property real controlCenterPreferredHeight: 24
+        + headerHeight
+        + connectivitySectionHeight
+        + systemTrayHeight
+        + detailsDrawerSectionHeight
+        + brightnessSectionHeight
+        + volumeSectionHeight
+        + Math.max(0, visibleSectionCount - 1) * sectionSpacing
+    readonly property real controlCenterMaximumPreferredHeight: 24
+        + headerHeight
+        + connectivitySectionHeight
+        + systemTrayHeight
+        + detailsDrawerMaximumSectionHeight
+        + brightnessSectionHeight
+        + volumeSectionHeight
+        + Math.max(0, visibleSectionCount - 1) * sectionSpacing
+    readonly property real controlCenterExtraHeight: Math.max(0, controlCenterPreferredHeight - 320)
+    readonly property real controlCenterMaximumExtraHeight: Math.max(0, controlCenterMaximumPreferredHeight - 320)
     readonly property bool bluetoothAvailable: !!bluetoothAdapter
     readonly property var bluetoothAdapter: Bluetooth.defaultAdapter
     readonly property var bluetoothDeviceValues: bluetoothAdapter ? bluetoothAdapter.devices.values : []
@@ -168,36 +225,80 @@ Item {
         return String(value).trim();
     }
 
-    function handleTrayItemClicked(item, visualItem, mouse) {
-        if (mouse.button === Qt.MiddleButton) {
-            item.secondaryActivate();
-            return;
+    function hasControlCenterItem(name) {
+        if (!configuredItems)
+            return false;
+
+        for (let i = 0; i < configuredItems.length; ++i) {
+            if (trimString(configuredItems[i]) === name)
+                return true;
         }
 
-        if (mouse.button === Qt.RightButton && item.hasMenu && menuParentWindow) {
-            const pos = visualItem.mapToItem(
-                menuParentWindow.contentItem,
-                mouse.x,
-                mouse.y
-            );
-
-            item.display(menuParentWindow, Math.round(pos.x), Math.round(pos.y));
-            return;
-        }
-
-        if (item.onlyMenu && item.hasMenu && menuParentWindow) {
-            const pos = visualItem.mapToItem(
-                menuParentWindow.contentItem,
-                mouse.x,
-                mouse.y
-            );
-
-            item.display(menuParentWindow, Math.round(pos.x), Math.round(pos.y));
-            return;
-        }
-
-        item.activate();
+        return false;
     }
+
+    function orderedQuickCardItems() {
+        const result = [];
+        if (!configuredItems)
+            return result;
+
+        for (let i = 0; i < configuredItems.length; ++i) {
+            const item = trimString(configuredItems[i]);
+        if (item === "wifi" || item === "bluetooth" || item === "tlp")
+                result.push(item);
+        }
+
+        return result;
+    }
+
+    function quickCardIndex(name) {
+        for (let i = 0; i < quickCardItems.length; ++i) {
+            if (quickCardItems[i] === name)
+                return i;
+        }
+
+        return -1;
+    }
+
+    function quickCardInMainRow(name) {
+        const index = quickCardIndex(name);
+        return index >= 0 && index < 2;
+    }
+
+    function quickCardInDrawer(name) {
+        return quickCardIndex(name) >= 2;
+    }
+
+	function handleTrayItemClicked(item, visualItem, mouse) {
+		if (mouse.button === Qt.MiddleButton) {
+			item.secondaryActivate();
+			return;
+		}
+
+		if (mouse.button === Qt.RightButton && item.hasMenu && menuParentWindow) {
+			const pos = visualItem.mapToItem(
+				menuParentWindow.contentItem,
+				mouse.x,
+				mouse.y
+			);
+
+			item.display(menuParentWindow, Math.round(pos.x), Math.round(pos.y));
+			return;
+		}
+
+		if (item.onlyMenu && item.hasMenu && menuParentWindow) {
+			const pos = visualItem.mapToItem(
+				menuParentWindow.contentItem,
+				mouse.x,
+				mouse.y
+			);
+
+			item.display(menuParentWindow, Math.round(pos.x), Math.round(pos.y));
+			return;
+		}
+
+		item.activate();
+	}
 
     function batteryModeLabel(index) {
         if (index <= 0) return "Power Saver";
@@ -223,21 +324,23 @@ Item {
         batteryModeIndex = nextIndex;
     }
 
-    function setBatteryDrawerOpen(open) {
+    function setDetailsDrawerOpen(open) {
         const nextOpen = !!open;
-        batteryDrawerOpen = nextOpen;
-        batteryDrawerSettling = true;
-        batteryDrawerProgress = nextOpen ? 1 : 0;
-        batteryDrawerSettleTimer.restart();
+        detailsDrawerOpen = nextOpen;
+        detailsDrawerSettling = true;
+        detailsDrawerProgress = nextOpen ? 1 : 0;
+        detailsDrawerSettleTimer.restart();
         if (nextOpen && !batteryTlpChecked)
             refreshBatteryModeState();
     }
 
-    function toggleBatteryDrawer() {
-        setBatteryDrawerOpen(!batteryDrawerOpen);
+    function toggleDetailsDrawer() {
+        setDetailsDrawerOpen(!detailsDrawerOpen);
     }
 
     function refreshBatteryModeState() {
+        if (!showTlp)
+            return;
         if (batteryModeStateRunning)
             return;
 
@@ -857,7 +960,8 @@ Item {
             displayedVolume = localVolume;
             sliderIntroTimer.interval = sliderIntroDelay;
             sliderIntroTimer.restart();
-            refreshBatteryModeState();
+            if (showTlp)
+                refreshBatteryModeState();
             requestWifiStateRefresh();
             if (wifiPanelOpen && wifiSupported && wifiEnabled)
                 requestWifiListRefresh(true);
@@ -876,7 +980,8 @@ Item {
         displayedVolume = localVolume;
         SystemServices.requestBrightness();
         SystemServices.requestVolume();
-        refreshBatteryModeState();
+        if (showTlp)
+            refreshBatteryModeState();
     }
 
     Behavior on opacity {
@@ -904,11 +1009,11 @@ Item {
         }
     }
 
-    Behavior on batteryDrawerProgress {
-        enabled: !controlCenter.batteryDrawerDragging
+    Behavior on detailsDrawerProgress {
+        enabled: !controlCenter.detailsDrawerDragging
 
         NumberAnimation {
-            id: batteryDrawerProgressAnimation
+            id: detailsDrawerProgressAnimation
             duration: 240
             easing.type: Easing.OutCubic
         }
@@ -1008,10 +1113,10 @@ Item {
     }
 
     Timer {
-        id: batteryDrawerSettleTimer
+        id: detailsDrawerSettleTimer
         interval: 300
         repeat: false
-        onTriggered: controlCenter.batteryDrawerSettling = false
+        onTriggered: controlCenter.detailsDrawerSettling = false
     }
 
     Connections {
@@ -1264,7 +1369,8 @@ Item {
 
         Item {
             width: parent.width
-            height: 80
+            height: controlCenter.connectivitySectionHeight
+            visible: controlCenter.showQuickCards
 
             Row {
                 id: connectivityCardsRow
@@ -1273,7 +1379,8 @@ Item {
 
                 Rectangle {
                     id: wifiCard
-                    width: (connectivityCardsRow.width - connectivityCardsRow.spacing) / 2
+                    visible: controlCenter.quickCardInMainRow("wifi")
+                    width: controlCenter.quickCardWidth
                     height: connectivityCardsRow.height
                     radius: 20
                     color: (wifiCardMouse.containsMouse || wifiPanelOpen) ? StyleTokens.connectivityCardHover : StyleTokens.connectivityCard
@@ -1398,7 +1505,8 @@ Item {
 
                 Rectangle {
                     id: bluetoothCard
-                    width: (connectivityCardsRow.width - connectivityCardsRow.spacing) / 2
+                    visible: controlCenter.quickCardInMainRow("bluetooth")
+                    width: controlCenter.quickCardWidth
                     height: connectivityCardsRow.height
                     radius: 20
                     color: (bluetoothCardMouse.containsMouse || bluetoothPanelOpen) ? StyleTokens.connectivityCardHover : StyleTokens.connectivityCard
@@ -1520,30 +1628,436 @@ Item {
                         }
                     }
                 }
+
+                Rectangle {
+                    id: tlpCard
+                    visible: controlCenter.quickCardInMainRow("tlp")
+                    width: controlCenter.quickCardWidth
+                    height: connectivityCardsRow.height
+                    radius: 20
+                    color: tlpCardMouse.containsMouse ? StyleTokens.connectivityCardHover : StyleTokens.connectivityCard
+
+                    Behavior on color {
+                        ColorAnimation {
+                            duration: StyleTokens.durationFast
+                        }
+                    }
+
+                    MouseArea {
+                        id: tlpCardMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        enabled: false
+                    }
+
+                    Text {
+                        anchors.left: parent.left
+                        anchors.leftMargin: 14
+                        anchors.top: parent.top
+                        anchors.topMargin: 11
+                        text: "TLP"
+                        color: textPrimary
+                        font.pixelSize: 13
+                        font.family: textFontFamily
+                        font.weight: Font.DemiBold
+                    }
+
+                    Text {
+                        anchors.right: parent.right
+                        anchors.rightMargin: 12
+                        anchors.top: parent.top
+                        anchors.topMargin: 12
+                        width: Math.max(0, parent.width - 88)
+                        text: controlCenter.batteryModeError.length > 0
+                            ? controlCenter.batteryModeError
+                            : (controlCenter.batteryModeInfoMessage.length > 0
+                                ? controlCenter.batteryModeInfoMessage
+                                : controlCenter.batteryModeStatusText)
+                        color: controlCenter.batteryModeError.length > 0 ? StyleTokens.error : StyleTokens.textMuted
+                        horizontalAlignment: Text.AlignRight
+                        font.pixelSize: 9
+                        font.family: textFontFamily
+                        font.weight: Font.Medium
+                        elide: Text.ElideRight
+                    }
+
+                    Item {
+                        id: tlpModeCarousel
+                        anchors.left: parent.left
+                        anchors.leftMargin: 12
+                        anchors.right: parent.right
+                        anchors.rightMargin: 12
+                        anchors.bottom: parent.bottom
+                        anchors.bottomMargin: 8
+                        height: 34
+                        clip: true
+
+                        Item {
+                            id: tlpModeItems
+                            width: controlCenter.batteryModeSlotWidth * 3
+                            height: parent.height
+                            x: tlpModeCarousel.width / 2
+                                - controlCenter.batteryModeSlotWidth / 2
+                                - controlCenter.batteryModeIndex * controlCenter.batteryModeSlotWidth
+                                + controlCenter.batteryModeDragOffset
+
+                            Behavior on x {
+                                enabled: !controlCenter.batteryModeSliderDragging
+
+                                NumberAnimation {
+                                    duration: 180
+                                    easing.type: Easing.OutCubic
+                                }
+                            }
+
+                            Repeater {
+                                model: 3
+
+                                delegate: Item {
+                                    x: index * controlCenter.batteryModeSlotWidth
+                                    width: controlCenter.batteryModeSlotWidth
+                                    height: tlpModeCarousel.height
+                                    opacity: index === controlCenter.batteryModeIndex ? 1 : 0.42
+
+                                    Rectangle {
+                                        anchors.centerIn: parent
+                                        width: index === controlCenter.batteryModeIndex ? 32 : 28
+                                        height: index === controlCenter.batteryModeIndex ? 28 : 24
+                                        radius: 12
+                                        color: index === controlCenter.batteryModeIndex ? StyleTokens.textPrimary : "#292a2f"
+
+                                        Text {
+                                            anchors.centerIn: parent
+                                            text: controlCenter.batteryModeGlyphs[index]
+                                            color: index === controlCenter.batteryModeIndex ? StyleTokens.module : StyleTokens.textDim
+                                            font.pixelSize: index === controlCenter.batteryModeIndex ? 15 : 13
+                                            font.family: iconFontFamily
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        Rectangle {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            anchors.bottom: parent.bottom
+                            width: 22
+                            height: 2
+                            radius: 1
+                            color: "#5d6068"
+                            opacity: 0.75
+                        }
+
+                        MouseArea {
+                            anchors.fill: parent
+                            property real startX: 0
+                            property int startIndex: 1
+                            property bool moved: false
+
+                            function clampDrag(delta) {
+                                return Math.max(-controlCenter.batteryModeSlotWidth, Math.min(controlCenter.batteryModeSlotWidth, delta));
+                            }
+
+                            onPressed: function(mouse) {
+                                startX = mouse.x;
+                                startIndex = controlCenter.batteryModeIndex;
+                                moved = false;
+                                controlCenter.batteryModeInfoMessage = "";
+                                controlCenter.batteryModeError = "";
+                                controlCenter.batteryModeSliderDragging = true;
+                                controlCenter.batteryModeDragOffset = 0;
+                            }
+
+                            onPositionChanged: function(mouse) {
+                                if (!pressed)
+                                    return;
+
+                                const delta = mouse.x - startX;
+                                if (!moved && Math.abs(delta) < 4)
+                                    return;
+
+                                moved = true;
+                                controlCenter.batteryModeDragOffset = clampDrag(delta);
+                            }
+
+                            onReleased: function(mouse) {
+                                const delta = mouse.x - startX;
+                                let nextIndex = startIndex;
+
+                                if (delta <= -18)
+                                    nextIndex = Math.min(2, startIndex + 1);
+                                else if (delta >= 18)
+                                    nextIndex = Math.max(0, startIndex - 1);
+                                else if (mouse.x < width / 2 - controlCenter.batteryModeSlotWidth / 2)
+                                    nextIndex = Math.max(0, startIndex - 1);
+                                else if (mouse.x > width / 2 + controlCenter.batteryModeSlotWidth / 2)
+                                    nextIndex = Math.min(2, startIndex + 1);
+
+                                controlCenter.batteryModeSliderDragging = false;
+                                controlCenter.batteryModeDragOffset = 0;
+                                controlCenter.selectBatteryMode(nextIndex);
+                            }
+
+                            onCanceled: {
+                                controlCenter.batteryModeSliderDragging = false;
+                                controlCenter.batteryModeDragOffset = 0;
+                                controlCenter.setBatteryModeVisualIndex(controlCenter.batteryModeAppliedIndex, true);
+                            }
+                        }
+                    }
+                }
             }
         }
 
         Item {
             id: batteryDrawer
-            readonly property real cardWidth: (width - connectivityCardsRow.spacing) / 2
+            readonly property real cardWidth: controlCenter.drawerCardWidth
             readonly property real modeSlotWidth: 44
-            readonly property real openDistance: controlCenter.batteryModeCardHeight
-                + controlCenter.batteryDrawerContentGap
+            readonly property real openDistance: controlCenter.connectivityHeight
+                + controlCenter.detailsDrawerContentGap
 
             width: parent.width
-            height: controlCenter.batteryDrawerHandleHeight
-                + controlCenter.batteryDrawerProgress * openDistance
+            visible: controlCenter.showDetailsDrawer
+            height: controlCenter.showDetailsDrawer
+                ? controlCenter.detailsDrawerHandleHeight + controlCenter.detailsDrawerProgress * openDistance
+                : 0
             clip: true
+
+            Row {
+                id: detailsDrawerContentRow
+                anchors.left: parent.left
+                anchors.right: parent.right
+                y: -height + controlCenter.detailsDrawerProgress * height
+                height: controlCenter.connectivityHeight
+                spacing: 12
+                opacity: Math.min(1, controlCenter.detailsDrawerProgress * 1.35)
+
+                Rectangle {
+                    id: drawerWifiCard
+                    visible: controlCenter.quickCardInDrawer("wifi")
+                    width: controlCenter.drawerCardWidth
+                    height: parent.height
+                    radius: 20
+                    color: drawerWifiCardMouse.containsMouse ? StyleTokens.connectivityCardHover : StyleTokens.connectivityCard
+
+                    MouseArea {
+                        id: drawerWifiCardMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                    }
+
+                    Text {
+                        anchors.left: parent.left
+                        anchors.leftMargin: 14
+                        anchors.top: parent.top
+                        anchors.topMargin: 12
+                        text: wifiGlyph
+                        color: wifiEnabled ? cardAccent : StyleTokens.textDisabled
+                        font.pixelSize: 18
+                        font.family: iconFontFamily
+                    }
+
+                    Rectangle {
+                        anchors.right: parent.right
+                        anchors.rightMargin: 12
+                        anchors.top: parent.top
+                        anchors.topMargin: 12
+                        width: 34
+                        height: 20
+                        radius: 10
+                        color: wifiEnabled ? StyleTokens.success : StyleTokens.switchOff
+
+                        Rectangle {
+                            width: 16
+                            height: 16
+                            radius: 8
+                            y: 2
+                            x: wifiEnabled ? 16 : 2
+                            color: StyleTokens.white
+                        }
+
+                        MouseArea {
+                            anchors.fill: parent
+                            enabled: wifiSupported && wifiAvailable && !wifiBusy
+                            onClicked: controlCenter.toggleWifiEnabled()
+                        }
+                    }
+
+                    Item {
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.bottom: parent.bottom
+                        anchors.leftMargin: 12
+                        anchors.rightMargin: 12
+                        anchors.bottomMargin: 8
+                        height: 30
+
+                        Text {
+                            anchors.left: parent.left
+                            anchors.right: drawerWifiChevron.left
+                            anchors.rightMargin: 8
+                            anchors.top: parent.top
+                            text: "Wi-Fi"
+                            color: textPrimary
+                            font.pixelSize: 13
+                            font.family: textFontFamily
+                            font.weight: Font.DemiBold
+                            elide: Text.ElideRight
+                        }
+
+                        Text {
+                            anchors.left: parent.left
+                            anchors.right: drawerWifiChevron.left
+                            anchors.rightMargin: 8
+                            anchors.bottom: parent.bottom
+                            text: wifiStatusText
+                            color: StyleTokens.textMuted
+                            font.pixelSize: 10
+                            font.family: textFontFamily
+                            font.weight: Font.Medium
+                            elide: Text.ElideRight
+                        }
+
+                        Text {
+                            id: drawerWifiChevron
+                            anchors.right: parent.right
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: "›"
+                            color: wifiPanelOpen ? "#c7c9cf" : StyleTokens.textSubtle
+                            font.pixelSize: 17
+                            font.family: textFontFamily
+                            font.weight: Font.DemiBold
+                        }
+                    }
+
+                    MouseArea {
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.bottom: parent.bottom
+                        height: 42
+                        onClicked: controlCenter.toggleConnectivityOverlay("wifi")
+                    }
+                }
+
+                Rectangle {
+                    id: drawerBluetoothCard
+                    visible: controlCenter.quickCardInDrawer("bluetooth")
+                    width: controlCenter.drawerCardWidth
+                    height: parent.height
+                    radius: 20
+                    color: drawerBluetoothCardMouse.containsMouse ? StyleTokens.connectivityCardHover : StyleTokens.connectivityCard
+
+                    MouseArea {
+                        id: drawerBluetoothCardMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                    }
+
+                    Text {
+                        anchors.left: parent.left
+                        anchors.leftMargin: 14
+                        anchors.top: parent.top
+                        anchors.topMargin: 12
+                        text: bluetoothGlyph
+                        color: bluetoothEnabled ? cardAccent : StyleTokens.textDisabled
+                        font.pixelSize: 18
+                        font.family: iconFontFamily
+                    }
+
+                    Rectangle {
+                        anchors.right: parent.right
+                        anchors.rightMargin: 12
+                        anchors.top: parent.top
+                        anchors.topMargin: 12
+                        width: 34
+                        height: 20
+                        radius: 10
+                        color: bluetoothEnabled ? StyleTokens.success : StyleTokens.switchOff
+
+                        Rectangle {
+                            width: 16
+                            height: 16
+                            radius: 8
+                            y: 2
+                            x: bluetoothEnabled ? 16 : 2
+                            color: StyleTokens.white
+                        }
+
+                        MouseArea {
+                            anchors.fill: parent
+                            enabled: bluetoothAvailable && !bluetoothBusy
+                            onClicked: controlCenter.toggleBluetoothEnabled()
+                        }
+                    }
+
+                    Item {
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.bottom: parent.bottom
+                        anchors.leftMargin: 12
+                        anchors.rightMargin: 12
+                        anchors.bottomMargin: 8
+                        height: 30
+
+                        Text {
+                            anchors.left: parent.left
+                            anchors.right: drawerBluetoothChevron.left
+                            anchors.rightMargin: 8
+                            anchors.top: parent.top
+                            text: "Bluetooth"
+                            color: textPrimary
+                            font.pixelSize: 13
+                            font.family: textFontFamily
+                            font.weight: Font.DemiBold
+                            elide: Text.ElideRight
+                        }
+
+                        Text {
+                            anchors.left: parent.left
+                            anchors.right: drawerBluetoothChevron.left
+                            anchors.rightMargin: 8
+                            anchors.bottom: parent.bottom
+                            text: bluetoothStatusText
+                            color: StyleTokens.textMuted
+                            font.pixelSize: 10
+                            font.family: textFontFamily
+                            font.weight: Font.Medium
+                            elide: Text.ElideRight
+                        }
+
+                        Text {
+                            id: drawerBluetoothChevron
+                            anchors.right: parent.right
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: "›"
+                            color: bluetoothPanelOpen ? "#c7c9cf" : StyleTokens.textSubtle
+                            font.pixelSize: 17
+                            font.family: textFontFamily
+                            font.weight: Font.DemiBold
+                        }
+                    }
+
+                    MouseArea {
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.bottom: parent.bottom
+                        height: 42
+                        onClicked: controlCenter.toggleConnectivityOverlay("bluetooth")
+                    }
+                }
+
+            }
 
             Rectangle {
                 id: batteryModeCard
+                visible: controlCenter.quickCardInDrawer("tlp")
                 anchors.left: parent.left
-                y: -height + controlCenter.batteryDrawerProgress * height
+                y: -height + controlCenter.detailsDrawerProgress * height
                 width: batteryDrawer.cardWidth
                 height: controlCenter.batteryModeCardHeight
                 radius: 20
                 color: StyleTokens.connectivityCard
-                opacity: Math.min(1, controlCenter.batteryDrawerProgress * 1.35)
+                opacity: Math.min(1, controlCenter.detailsDrawerProgress * 1.35)
                 clip: true
 
                 Text {
@@ -1551,7 +2065,7 @@ Item {
                     anchors.leftMargin: 14
                     anchors.top: parent.top
                     anchors.topMargin: 11
-                    text: "Battery"
+                    text: "TLP"
                     color: textPrimary
                     font.pixelSize: 13
                     font.family: textFontFamily
@@ -1735,9 +2249,9 @@ Item {
                 anchors.left: parent.left
                 anchors.top: parent.top
                 width: batteryDrawer.cardWidth
-                height: Math.max(1, controlCenter.batteryDrawerContentGap * 0.35)
+                height: Math.max(1, controlCenter.detailsDrawerContentGap * 0.35)
                 z: 6
-                opacity: Math.min(0.34, controlCenter.batteryDrawerProgress * 0.45)
+                opacity: Math.min(0.34, controlCenter.detailsDrawerProgress * 0.45)
                 gradient: Gradient {
                     GradientStop {
                         position: 0
@@ -1754,8 +2268,8 @@ Item {
                 id: batteryDrawerHandle
                 anchors.left: parent.left
                 anchors.right: parent.right
-                y: controlCenter.batteryDrawerProgress * batteryDrawer.openDistance
-                height: controlCenter.batteryDrawerHandleHeight
+                y: controlCenter.detailsDrawerProgress * batteryDrawer.openDistance
+                height: controlCenter.detailsDrawerHandleHeight
                 z: 10
 
                 Rectangle {
@@ -1764,7 +2278,7 @@ Item {
                     width: 48
                     height: 5
                     radius: 3
-                    color: controlCenter.batteryDrawerOpen ? "#d4d6dc" : StyleTokens.textSubtle
+                    color: controlCenter.detailsDrawerOpen ? "#d4d6dc" : StyleTokens.textSubtle
                     opacity: 0.88
                 }
 
@@ -1784,12 +2298,12 @@ Item {
                     }
 
                     onPressed: function(mouse) {
-                        batteryDrawerSettleTimer.stop();
-                        controlCenter.batteryDrawerSettling = false;
+                        detailsDrawerSettleTimer.stop();
+                        controlCenter.detailsDrawerSettling = false;
                         pointerGrabOffset = pointerY(mouse) - itemTop(batteryDrawerHandle);
                         moved = false;
                         suppressClick = false;
-                        controlCenter.batteryDrawerDragging = true;
+                        controlCenter.detailsDrawerDragging = true;
                     }
 
                     onPositionChanged: function(mouse) {
@@ -1799,18 +2313,18 @@ Item {
 
                         moved = true;
                         suppressClick = true;
-                        controlCenter.batteryDrawerProgress = controlCenter.clamp01(nextHandleY / batteryDrawer.openDistance);
+                        controlCenter.detailsDrawerProgress = controlCenter.clamp01(nextHandleY / batteryDrawer.openDistance);
                     }
 
                     onReleased: {
-                        controlCenter.batteryDrawerDragging = false;
+                        controlCenter.detailsDrawerDragging = false;
                         if (moved)
-                            controlCenter.setBatteryDrawerOpen(controlCenter.batteryDrawerProgress >= 0.55);
+                            controlCenter.setDetailsDrawerOpen(controlCenter.detailsDrawerProgress >= 0.55);
                     }
 
                     onCanceled: {
-                        controlCenter.batteryDrawerDragging = false;
-                        controlCenter.setBatteryDrawerOpen(controlCenter.batteryDrawerOpen);
+                        controlCenter.detailsDrawerDragging = false;
+                        controlCenter.setDetailsDrawerOpen(controlCenter.detailsDrawerOpen);
                     }
 
                     onClicked: {
@@ -1819,7 +2333,7 @@ Item {
                             return;
                         }
 
-                        controlCenter.toggleBatteryDrawer();
+                        controlCenter.toggleDetailsDrawer();
                     }
                 }
             }
@@ -1828,7 +2342,8 @@ Item {
         ControlSliderCard {
             id: brightnessCard
             width: parent.width
-            height: 76
+            height: controlCenter.showBrightness ? controlCenter.sliderCardHeight : 0
+            visible: controlCenter.showBrightness
             title: "Display"
             iconText: controlCenter.brightnessIconGlyph
             iconFontFamily: controlCenter.iconFontFamily
@@ -1862,7 +2377,8 @@ Item {
         ControlSliderCard {
             id: volumeCard
             width: parent.width
-            height: 76
+            height: controlCenter.volumeSectionHeight
+            visible: controlCenter.showVolume
             title: "Sound"
             iconText: controlCenter.volumeIconGlyph
             iconFontFamily: controlCenter.iconFontFamily

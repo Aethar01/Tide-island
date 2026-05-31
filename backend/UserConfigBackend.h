@@ -28,6 +28,7 @@ class UserConfigBackend final : public QObject {
     Q_PROPERTY(QString overviewGlobalShortcutName READ overviewGlobalShortcutName NOTIFY overviewGlobalShortcutNameChanged FINAL)
 
     Q_PROPERTY(bool showControlCenterBattery READ showControlCenterBattery NOTIFY showControlCenterBatteryChanged FINAL)
+    Q_PROPERTY(QVariantList controlCenterItems READ controlCenterItems NOTIFY controlCenterItemsChanged FINAL)
 
     Q_PROPERTY(int workspaceOverviewWindowDragButton READ workspaceOverviewWindowDragButton NOTIFY workspaceOverviewWindowDragButtonChanged FINAL)
 
@@ -54,6 +55,7 @@ public:
     QString overviewGlobalShortcutAppid() const;
     QString overviewGlobalShortcutName() const;
     bool showControlCenterBattery() const;
+    const QVariantList &controlCenterItems() const;
     int workspaceOverviewWindowDragButton() const;
     int dynamicIslandPrimaryButton() const;
     QString dynamicIslandPrimaryAction() const;
@@ -81,6 +83,7 @@ signals:
     void overviewGlobalShortcutAppidChanged();
     void overviewGlobalShortcutNameChanged();
     void showControlCenterBatteryChanged();
+    void controlCenterItemsChanged();
     void workspaceOverviewWindowDragButtonChanged();
     void dynamicIslandPrimaryButtonChanged();
     void dynamicIslandPrimaryActionChanged();
@@ -108,6 +111,7 @@ private:
     QString m_overviewGlobalShortcutAppid = QStringLiteral("quickshell");
     QString m_overviewGlobalShortcutName = QStringLiteral("dynamic-island-overview");
     bool m_showControlCenterBattery = true;
+    QVariantList m_controlCenterItems;
     int m_workspaceOverviewWindowDragButton = 1;
     int m_dynamicIslandPrimaryButton = 1;
     QString m_dynamicIslandPrimaryAction = QStringLiteral("toggleExpandedPlayer");

@@ -132,7 +132,7 @@ PanelWindow {
         ? controlCenterLoader.item.controlCenterMaximumExtraHeight
         : 120
     readonly property real controlCenterWindowHeight: islandContainer.controlCenterLayerVisible
-        ? 4 + 320 + root.controlCenterMaximumExtraHeight + 12
+        ? 4 + (controlCenterLoader.item ? controlCenterLoader.item.controlCenterMaximumPreferredHeight : 440) + 12
         : 0
     readonly property real connectivityDetailGap: 16
     readonly property int connectivityDetailAnimationDuration: 360
@@ -1085,7 +1085,7 @@ PanelWindow {
 
                 switch (islandContainer.islandState) {
                 case "control_center":
-                    return 320 + (controlCenterLoader.item ? controlCenterLoader.item.controlCenterExtraHeight : 32);
+                    return controlCenterLoader.item ? controlCenterLoader.item.controlCenterPreferredHeight : 352;
                 case "expanded":
                 case "bluetooth_expanded":
                     return 165;
