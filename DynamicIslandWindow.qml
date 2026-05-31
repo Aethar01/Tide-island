@@ -40,6 +40,7 @@ PanelWindow {
         : false
 
     readonly property var userConfig: UserConfig
+    readonly property bool controlCenterOverlayMode: UserConfig.controlCenterOverlayMode
 
     HyprlandDispatch {
         id: hyprDispatch
@@ -89,7 +90,7 @@ PanelWindow {
             Math.ceil(root.controlCenterWindowHeight)
         )
         : Math.max(Math.ceil(4 + root.connectivityDetailHeight + 12), Math.ceil(root.controlCenterWindowHeight))
-    exclusiveZone: 45
+    exclusiveZone: root.controlCenterOverlayMode && islandContainer.overlayActive ? 0 : 45
     aboveWindows: true
     focusable: root.monitorFocused && (root.overviewVisible || root.connectivityPromptActive)
     WlrLayershell.layer: WlrLayer.Top
@@ -132,7 +133,7 @@ PanelWindow {
         ? controlCenterLoader.item.controlCenterMaximumExtraHeight
         : 120
     readonly property real controlCenterWindowHeight: islandContainer.controlCenterLayerVisible
-        ? 4 + (controlCenterLoader.item ? controlCenterLoader.item.controlCenterMaximumPreferredHeight : 440) + 12
+        ? 12 + (controlCenterLoader.item ? controlCenterLoader.item.controlCenterMaximumPreferredHeight : 440) + 12
         : 0
     readonly property real connectivityDetailGap: 16
     readonly property int connectivityDetailAnimationDuration: 360
@@ -361,6 +362,7 @@ PanelWindow {
         focus: root.monitorFocused && (root.overviewVisible || root.connectivityPromptActive)
 
         property string islandState: "normal"
+        property bool overlayActive: false
         property string splitIcon: root.defaultSplitIcon
         property real osdProgress: -1.0
         property bool osdProgressAnimationEnabled: true
@@ -882,6 +884,11 @@ PanelWindow {
 
         function restoreRestingCapsule(forceImmediate) {
             if (forceImmediate === undefined) forceImmediate = false;
+            if (root.controlCenterOverlayMode && overlayActive) {
+                overlayActive = false;
+                stopAutoHideTimer();
+                return;
+            }
             const normalizedRestingState = normalizeRestingState(restingState);
             const targetSide = restingStateSide(normalizedRestingState);
             const shouldAnimateToSide = targetSide !== "none"
@@ -949,7 +956,11 @@ PanelWindow {
             cancelSideSwipeSettle();
             abortSideTransientMode();
             clearTransientCapsule();
-            islandState = "control_center";
+            if (root.controlCenterOverlayMode) {
+                overlayActive = true;
+            } else {
+                islandState = "control_center";
+            }
             mainCapsule.displayedWidth = mainCapsule.baseTargetWidth;
             stopAutoHideTimer();
         }

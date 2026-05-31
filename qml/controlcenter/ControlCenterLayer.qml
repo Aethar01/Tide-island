@@ -157,16 +157,14 @@ Item {
         + (showBrightness ? 1 : 0)
         + (showVolume ? 1 : 0)
         + (systemTrayVisible ? 1 : 0)
-    readonly property real controlCenterPreferredHeight: 24
-        + headerHeight
+    readonly property real controlCenterPreferredHeight: headerHeight
         + connectivitySectionHeight
         + systemTrayHeight
         + detailsDrawerSectionHeight
         + brightnessSectionHeight
         + volumeSectionHeight
         + Math.max(0, visibleSectionCount - 1) * sectionSpacing
-    readonly property real controlCenterMaximumPreferredHeight: 24
-        + headerHeight
+    readonly property real controlCenterMaximumPreferredHeight: headerHeight
         + connectivitySectionHeight
         + systemTrayHeight
         + detailsDrawerMaximumSectionHeight

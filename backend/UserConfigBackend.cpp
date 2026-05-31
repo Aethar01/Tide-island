@@ -149,6 +149,11 @@ bool UserConfigBackend::showControlCenterBattery() const
     return m_showControlCenterBattery;
 }
 
+bool UserConfigBackend::controlCenterOverlayMode() const
+{
+    return m_controlCenterOverlayMode;
+}
+
 const QVariantList &UserConfigBackend::controlCenterItems() const
 {
     return m_controlCenterItems;
@@ -292,6 +297,7 @@ void UserConfigBackend::loadConfig()
     updateField(this, m_overviewGlobalShortcutAppid, jsonString(configObject, QLatin1String("overviewGlobalShortcutAppid"), QStringLiteral("quickshell")), &UserConfigBackend::overviewGlobalShortcutAppidChanged);
     updateField(this, m_overviewGlobalShortcutName, jsonString(configObject, QLatin1String("overviewGlobalShortcutName"), QStringLiteral("dynamic-island-overview")), &UserConfigBackend::overviewGlobalShortcutNameChanged);
     updateField(this, m_showControlCenterBattery, jsonBool(configObject, QLatin1String("showControlCenterBattery"), true), &UserConfigBackend::showControlCenterBatteryChanged);
+    updateField(this, m_controlCenterOverlayMode, jsonBool(configObject, QLatin1String("controlCenterOverlayMode"), false), &UserConfigBackend::controlCenterOverlayModeChanged);
     updateField(this, m_controlCenterItems, jsonArray(configObject, QLatin1String("controlCenterItems"), defaultControlCenterItems()), &UserConfigBackend::controlCenterItemsChanged);
     updateField(this, m_workspaceOverviewWindowDragButton, jsonInt(configObject, QLatin1String("workspaceOverviewWindowDragButton"), 1), &UserConfigBackend::workspaceOverviewWindowDragButtonChanged);
     updateField(this, m_dynamicIslandPrimaryButton, jsonInt(configObject, QLatin1String("dynamicIslandPrimaryButton"), 1), &UserConfigBackend::dynamicIslandPrimaryButtonChanged);
