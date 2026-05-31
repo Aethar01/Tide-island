@@ -133,7 +133,7 @@ PanelWindow {
         ? controlCenterLoader.item.controlCenterMaximumExtraHeight
         : 120
     readonly property real controlCenterWindowHeight: islandContainer.controlCenterLayerVisible
-        ? 12 + (controlCenterLoader.item ? controlCenterLoader.item.controlCenterMaximumPreferredHeight : 440) + 12
+        ? 4 + (controlCenterLoader.item ? controlCenterLoader.item.controlCenterMaximumPreferredHeight : 440) + 12
         : 0
     readonly property real connectivityDetailGap: 16
     readonly property int connectivityDetailAnimationDuration: 360
@@ -884,11 +884,6 @@ PanelWindow {
 
         function restoreRestingCapsule(forceImmediate) {
             if (forceImmediate === undefined) forceImmediate = false;
-            if (root.controlCenterOverlayMode && overlayActive) {
-                overlayActive = false;
-                stopAutoHideTimer();
-                return;
-            }
             const normalizedRestingState = normalizeRestingState(restingState);
             const targetSide = restingStateSide(normalizedRestingState);
             const shouldAnimateToSide = targetSide !== "none"
@@ -956,11 +951,7 @@ PanelWindow {
             cancelSideSwipeSettle();
             abortSideTransientMode();
             clearTransientCapsule();
-            if (root.controlCenterOverlayMode) {
-                overlayActive = true;
-            } else {
-                islandState = "control_center";
-            }
+			islandState = "control_center";
             mainCapsule.displayedWidth = mainCapsule.baseTargetWidth;
             stopAutoHideTimer();
         }
