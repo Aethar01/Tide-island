@@ -1087,7 +1087,7 @@ PanelWindow {
 
                 switch (islandContainer.islandState) {
                 case "control_center":
-					return 320 + (controlCenterLoader.item ? controlCenterLoader.item.controlCenterExtraHeight : 32);
+					return 320 + (controlCenterLoader.item ? controlCenterLoader.item.controlCenterExtraHeight : 34);
                 case "expanded":
                 case "bluetooth_expanded":
                     return 165;
