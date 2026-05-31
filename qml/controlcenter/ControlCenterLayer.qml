@@ -8,6 +8,7 @@ Item {
     signal connectivityPanelRequested(string kind, bool open)
 
     readonly property var userConfig: UserConfig
+    readonly property bool showHeaderBattery: userConfig.showControlCenterBattery !== false
 
     property bool showCondition: false
     property string iconFontFamily: userConfig.iconFontFamily
@@ -1069,6 +1070,7 @@ Item {
                 anchors.rightMargin: 2
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: 5
+                visible: controlCenter.showHeaderBattery
 
                 Text {
                     text: controlCenter.chargingIconGlyph

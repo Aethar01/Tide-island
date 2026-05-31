@@ -40,6 +40,7 @@ void UserConfigBackendTests::loadsTypedValuesFromJson()
         "wallpaperPath": "/tmp/test-wallpaper.jpg",
         "textFontFamily": "Test Text",
         "tlpPermissionMode": "skip",
+        "showControlCenterBattery": false,
         "dynamicIslandLeftSwipeItems": ["time", "ram"]
     })json");
     QVERIFY(!configPath.isEmpty());
@@ -50,6 +51,7 @@ void UserConfigBackendTests::loadsTypedValuesFromJson()
     QCOMPARE(config.wallpaperPath(), QStringLiteral("/tmp/test-wallpaper.jpg"));
     QCOMPARE(config.textFontFamily(), QStringLiteral("Test Text"));
     QCOMPARE(config.tlpPermissionMode(), QStringLiteral("skip"));
+    QCOMPARE(config.showControlCenterBattery(), false);
     QCOMPARE(config.dynamicIslandLeftSwipeItems(), QVariantList({QStringLiteral("time"), QStringLiteral("ram")}));
 }
 
@@ -64,6 +66,7 @@ void UserConfigBackendTests::exposesParseErrorsAndFallsBackToDefaults()
     UserConfigBackend config;
     QVERIFY(!config.configError().isEmpty());
     QCOMPARE(config.textFontFamily(), QStringLiteral("Inter Display"));
+    QCOMPARE(config.showControlCenterBattery(), true);
     QCOMPARE(config.dynamicIslandLeftSwipeItems(), QVariantList({QStringLiteral("cava"), QStringLiteral("battery")}));
 }
 

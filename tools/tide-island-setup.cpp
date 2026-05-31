@@ -121,6 +121,7 @@ QJsonObject defaultUserConfig()
         {QString::fromLatin1(tlpPermissionModeKey), QString()},
         {QStringLiteral("overviewGlobalShortcutAppid"), QStringLiteral("quickshell")},
         {QStringLiteral("overviewGlobalShortcutName"), QStringLiteral("dynamic-island-overview")},
+        {QStringLiteral("showControlCenterBattery"), true},
         {QStringLiteral("workspaceOverviewWindowDragButton"), 1},
         {QStringLiteral("dynamicIslandPrimaryButton"), 1},
         {QStringLiteral("dynamicIslandPrimaryAction"), QStringLiteral("toggleExpandedPlayer")},

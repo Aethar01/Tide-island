@@ -35,6 +35,12 @@ int jsonInt(const QJsonObject &object, QLatin1String key, int fallback)
     return std::isfinite(number) ? qRound(number) : fallback;
 }
 
+bool jsonBool(const QJsonObject &object, QLatin1String key, bool fallback)
+{
+    const QJsonValue value = object.value(key);
+    return value.isBool() ? value.toBool() : fallback;
+}
+
 QVariantList jsonArray(const QJsonObject &object, QLatin1String key, const QVariantList &fallback)
 {
     const QJsonValue value = object.value(key);
@@ -130,6 +136,11 @@ QString UserConfigBackend::overviewGlobalShortcutAppid() const
 QString UserConfigBackend::overviewGlobalShortcutName() const
 {
     return m_overviewGlobalShortcutName;
+}
+
+bool UserConfigBackend::showControlCenterBattery() const
+{
+    return m_showControlCenterBattery;
 }
 
 int UserConfigBackend::workspaceOverviewWindowDragButton() const
@@ -269,6 +280,7 @@ void UserConfigBackend::loadConfig()
     updateField(this, m_tlpPermissionMode, jsonString(configObject, QLatin1String("tlpPermissionMode"), QStringLiteral("ask")), &UserConfigBackend::tlpPermissionModeChanged);
     updateField(this, m_overviewGlobalShortcutAppid, jsonString(configObject, QLatin1String("overviewGlobalShortcutAppid"), QStringLiteral("quickshell")), &UserConfigBackend::overviewGlobalShortcutAppidChanged);
     updateField(this, m_overviewGlobalShortcutName, jsonString(configObject, QLatin1String("overviewGlobalShortcutName"), QStringLiteral("dynamic-island-overview")), &UserConfigBackend::overviewGlobalShortcutNameChanged);
+    updateField(this, m_showControlCenterBattery, jsonBool(configObject, QLatin1String("showControlCenterBattery"), true), &UserConfigBackend::showControlCenterBatteryChanged);
     updateField(this, m_workspaceOverviewWindowDragButton, jsonInt(configObject, QLatin1String("workspaceOverviewWindowDragButton"), 1), &UserConfigBackend::workspaceOverviewWindowDragButtonChanged);
     updateField(this, m_dynamicIslandPrimaryButton, jsonInt(configObject, QLatin1String("dynamicIslandPrimaryButton"), 1), &UserConfigBackend::dynamicIslandPrimaryButtonChanged);
     updateField(this, m_dynamicIslandPrimaryAction, jsonString(configObject, QLatin1String("dynamicIslandPrimaryAction"), QStringLiteral("toggleExpandedPlayer")), &UserConfigBackend::dynamicIslandPrimaryActionChanged);
