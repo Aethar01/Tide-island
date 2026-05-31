@@ -64,6 +64,31 @@ Scope {
     }
 
     IpcHandler {
+        target: "bar"
+
+        function toggle() {
+            shellRoot.forEachWindow((window) => {
+                if (window)
+                    window.visible = !window.visible;
+            });
+        }
+
+        function show() {
+            shellRoot.forEachWindow((window) => {
+                if (window)
+                    window.visible = true;
+            });
+        }
+
+        function hide() {
+            shellRoot.forEachWindow((window) => {
+                if (window)
+                    window.visible = false;
+            });
+        }
+    }
+
+    IpcHandler {
         target: "overview"
 
         function toggle() {
@@ -85,14 +110,6 @@ Scope {
             });
         }
     }
-
-	IpcHandler {
-        target: "bar"
-        function toggle() {
-            root.visible = !root.visible
-        }
-    }
-
 
     GlobalShortcut {
         appid: userConfig.overviewGlobalShortcutAppid

@@ -164,6 +164,7 @@ Item {
         + brightnessSectionHeight
         + volumeSectionHeight
         + Math.max(0, visibleSectionCount - 1) * sectionSpacing
+        + 24
     readonly property real controlCenterMaximumPreferredHeight: headerHeight
         + connectivitySectionHeight
         + systemTrayHeight
@@ -171,6 +172,7 @@ Item {
         + brightnessSectionHeight
         + volumeSectionHeight
         + Math.max(0, visibleSectionCount - 1) * sectionSpacing
+        + 24
     readonly property real controlCenterExtraHeight: Math.max(0, controlCenterPreferredHeight - 320)
     readonly property real controlCenterMaximumExtraHeight: Math.max(0, controlCenterMaximumPreferredHeight - 320)
     readonly property bool bluetoothAvailable: !!bluetoothAdapter

@@ -1087,7 +1087,7 @@ PanelWindow {
 
                 switch (islandContainer.islandState) {
                 case "control_center":
-                    return controlCenterLoader.item ? controlCenterLoader.item.controlCenterPreferredHeight : 354;
+					return controlCenterLoader.item ? controlCenterLoader.item.controlCenterPreferredHeight : 352;
                 case "expanded":
                 case "bluetooth_expanded":
                     return 165;
@@ -1146,7 +1146,7 @@ PanelWindow {
                 }
             }
             Behavior on height {
-                enabled: !(controlCenterLoader.item && controlCenterLoader.item.batteryDrawerMoving)
+                enabled: !(controlCenterLoader.item && controlCenterLoader.item.detailsDrawerMoving)
 
                 NumberAnimation {
                     duration: mainCapsule.morphDuration
