@@ -1,5 +1,7 @@
 import QtQuick
 import Quickshell.Bluetooth
+import Quickshell.Services.SystemTray
+import Quickshell.Widgets
 import IslandBackend
 
 Item {
@@ -9,6 +11,11 @@ Item {
 
     readonly property var userConfig: UserConfig
     readonly property bool showHeaderBattery: userConfig.showControlCenterBattery !== false
+    property var menuParentWindow: null
+    readonly property bool showTray: true
+    readonly property bool headerTrayVisible: !showHeaderBattery && showTray
+    readonly property bool systemTrayVisible: showHeaderBattery && showTray
+    readonly property real systemTrayHeight: systemTrayVisible ? 34 : 0
 
     property bool showCondition: false
     property string iconFontFamily: userConfig.iconFontFamily
@@ -159,6 +166,37 @@ Item {
     function trimString(value) {
         if (value === undefined || value === null) return "";
         return String(value).trim();
+    }
+
+    function handleTrayItemClicked(item, visualItem, mouse) {
+        if (mouse.button === Qt.MiddleButton) {
+            item.secondaryActivate();
+            return;
+        }
+
+        if (mouse.button === Qt.RightButton && item.hasMenu && menuParentWindow) {
+            const pos = visualItem.mapToItem(
+                menuParentWindow.contentItem,
+                mouse.x,
+                mouse.y
+            );
+
+            item.display(menuParentWindow, Math.round(pos.x), Math.round(pos.y));
+            return;
+        }
+
+        if (item.onlyMenu && item.hasMenu && menuParentWindow) {
+            const pos = visualItem.mapToItem(
+                menuParentWindow.contentItem,
+                mouse.x,
+                mouse.y
+            );
+
+            item.display(menuParentWindow, Math.round(pos.x), Math.round(pos.y));
+            return;
+        }
+
+        item.activate();
     }
 
     function batteryModeLabel(index) {
@@ -1132,6 +1170,93 @@ Item {
                         color: StyleTokens.textSecondary
                         anchors.right: parent.right
                         anchors.verticalCenter: parent.verticalCenter
+                    }
+                }
+            }
+
+            Rectangle {
+                anchors.right: parent.right
+                anchors.rightMargin: 2
+                anchors.verticalCenter: parent.verticalCenter
+                width: Math.min(parent.width - 230, headerTrayRow.implicitWidth + 18)
+                height: 28
+                radius: 14
+                color: StyleTokens.module
+                visible: controlCenter.headerTrayVisible
+
+                Row {
+                    id: headerTrayRow
+                    anchors.centerIn: parent
+                    spacing: 8
+
+                    Repeater {
+                        model: SystemTray.items
+
+                        delegate: Item {
+                            id: headerTrayButton
+                            width: 20
+                            height: 20
+
+                            IconImage {
+                                anchors.fill: parent
+                                source: modelData.icon
+                                implicitSize: 20
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                acceptedButtons: Qt.LeftButton | Qt.MiddleButton | Qt.RightButton
+                                hoverEnabled: true
+                                onClicked: function(mouse) { controlCenter.handleTrayItemClicked(modelData, headerTrayButton, mouse); }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Item {
+            id: systemTraySection
+            width: parent.width
+            height: controlCenter.systemTrayHeight
+            visible: controlCenter.systemTrayVisible
+
+            Rectangle {
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                width: Math.min(parent.width, systemTrayRow.implicitWidth + 18)
+                height: 34
+                radius: 17
+                color: StyleTokens.module
+
+                Row {
+                    id: systemTrayRow
+                    anchors.centerIn: parent
+                    spacing: 8
+
+                    Repeater {
+                        id: systemTrayRepeater
+                        model: SystemTray.items
+
+                        delegate: Item {
+                            id: trayButton
+                            width: 22
+                            height: 22
+
+                            IconImage {
+                                anchors.fill: parent
+                                source: modelData.icon
+                                implicitSize: 22
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                acceptedButtons: Qt.LeftButton | Qt.MiddleButton | Qt.RightButton
+                                hoverEnabled: true
+
+                                onClicked: function(mouse) { controlCenter.handleTrayItemClicked(modelData, trayButton, mouse); }
+                            }
+                        }
                     }
                 }
             }

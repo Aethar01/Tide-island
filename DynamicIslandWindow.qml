@@ -1597,6 +1597,7 @@ PanelWindow {
                         iconFontFamily: root.iconFontFamily
                         textFontFamily: root.textFontFamily
                         heroFontFamily: root.heroFontFamily
+                        menuParentWindow: root
                         sliderIntroDelay: mainCapsule.morphDuration
                         currentTime: timeObj.currentTime
                         currentDateLabel: timeObj.currentDateLabel
