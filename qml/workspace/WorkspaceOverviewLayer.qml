@@ -13,9 +13,7 @@ Item {
 
     readonly property var userConfig: UserConfig
 
-    HyprlandDispatch {
-        id: hyprDispatch
-    }
+    HyprlandDispatch { id: hyprDispatch }
 
     required property var screen
     required property var hyprlandData
@@ -41,22 +39,15 @@ Item {
     readonly property var monitorData: findMonitorData(monitor ? monitor.id : -1)
     readonly property int workspacesShown: rows * columns
     readonly property int effectiveActiveWorkspaceId: {
-        const workspaceId = monitor && monitor.activeWorkspace
-            ? monitor.activeWorkspace.id
-            : (hyprlandData && hyprlandData.activeWorkspace ? hyprlandData.activeWorkspace.id : 1);
-        return Math.max(1, Math.min(100, workspaceId || 1));
+        const id = monitor && monitor.activeWorkspace ? monitor.activeWorkspace.id
+            : (hyprlandData && hyprlandData.activeWorkspace ? hyprlandData.activeWorkspace.id : 1)
+        return Math.max(1, Math.min(100, id || 1))
     }
     readonly property int workspaceGroup: Math.floor((effectiveActiveWorkspaceId - 1) / workspacesShown)
     readonly property real workspaceSpacing: 6
     readonly property real outerPadding: 14
     readonly property real largeWorkspaceRadius: 30
     readonly property real smallWorkspaceRadius: 16
-    readonly property int workspaceOverviewCellAcceptedButtons: Qt.LeftButton
-    readonly property int workspaceOverviewWindowAcceptedButtons: userConfig.mouseButtonsMask([
-        userConfig.workspaceOverviewWindowDragButton,
-        1,
-        3
-    ])
     readonly property color activeBorderColor: StyleTokens.workspaceActiveBorder
     readonly property color cardColor: StyleTokens.overviewCard
     readonly property color cardBorderColor: StyleTokens.overviewBorder
@@ -64,22 +55,20 @@ Item {
     readonly property color workspaceHoverColor: StyleTokens.workspaceCellHover
     readonly property color workspaceBorderHoverColor: StyleTokens.workspaceCellBorderHover
     readonly property real workspaceImplicitWidth: {
-        const reserved = monitorData && monitorData.reserved ? monitorData.reserved : [0, 0, 0, 0];
-        const screenWidth = monitor ? monitor.width : (screen ? screen.width : 1920);
-        const screenHeight = monitor ? monitor.height : (screen ? screen.height : 1080);
-        const transform = monitorData && monitorData.transform !== undefined ? monitorData.transform : 0;
-        const monitorScale = monitor && monitor.scale ? monitor.scale : 1;
-        const baseWidth = transform % 2 === 1 ? screenHeight : screenWidth;
-        return Math.max(180, (baseWidth - reserved[0] - reserved[2]) * scale / monitorScale);
+        const res = monitorData && monitorData.reserved ? monitorData.reserved : [0,0,0,0]
+        const sw = monitor ? monitor.width : (screen ? screen.width : 1920)
+        const sh = monitor ? monitor.height : (screen ? screen.height : 1080)
+        const t = monitorData && monitorData.transform !== undefined ? monitorData.transform : 0
+        const ms = monitor && monitor.scale ? monitor.scale : 1
+        return Math.max(180, ((t % 2 === 1 ? sh : sw) - res[0] - res[2]) * scale / ms)
     }
     readonly property real workspaceImplicitHeight: {
-        const reserved = monitorData && monitorData.reserved ? monitorData.reserved : [0, 0, 0, 0];
-        const screenWidth = monitor ? monitor.width : (screen ? screen.width : 1920);
-        const screenHeight = monitor ? monitor.height : (screen ? screen.height : 1080);
-        const transform = monitorData && monitorData.transform !== undefined ? monitorData.transform : 0;
-        const monitorScale = monitor && monitor.scale ? monitor.scale : 1;
-        const baseHeight = transform % 2 === 1 ? screenWidth : screenHeight;
-        return Math.max(120, (baseHeight - reserved[1] - reserved[3]) * scale / monitorScale);
+        const res = monitorData && monitorData.reserved ? monitorData.reserved : [0,0,0,0]
+        const sw = monitor ? monitor.width : (screen ? screen.width : 1920)
+        const sh = monitor ? monitor.height : (screen ? screen.height : 1080)
+        const t = monitorData && monitorData.transform !== undefined ? monitorData.transform : 0
+        const ms = monitor && monitor.scale ? monitor.scale : 1
+        return Math.max(120, ((t % 2 === 1 ? sw : sh) - res[1] - res[3]) * scale / ms)
     }
 
     property int draggingFromWorkspace: -1
@@ -90,10 +79,8 @@ Item {
     property string pressedAddress: ""
     property var windowToplevels: []
     property var windowMoveHints: ({})
-    property string _windowToplevelsSignature: ""
-    readonly property var toplevelValues: ToplevelManager.toplevels && ToplevelManager.toplevels.values
-        ? ToplevelManager.toplevels.values
-        : []
+    property string _toplevelSig: ""
+    readonly property var toplevelValues: ToplevelManager.toplevels && ToplevelManager.toplevels.values ? ToplevelManager.toplevels.values : []
 
     signal closeRequested()
 
@@ -104,361 +91,234 @@ Item {
     implicitWidth: overviewCard.implicitWidth
     implicitHeight: overviewCard.implicitHeight
 
-    function findMonitorData(monitorId) {
-        const monitors = hyprlandData && hyprlandData.monitors ? hyprlandData.monitors : [];
-        for (let index = 0; index < monitors.length; index++) {
-            if (monitors[index].id === monitorId)
-                return monitors[index];
+    // ── helpers ──────────────────────────────────────────────
+
+    function findMonitorData(monId) {
+        const mons = hyprlandData && hyprlandData.monitors ? hyprlandData.monitors : []
+        for (let i = 0; i < mons.length; i++)
+            if (mons[i].id === monId) return mons[i]
+        return null
+    }
+    function getWsRow(wsId) { const nr = Math.floor((wsId-1)/columns)%rows; return orderBottomUp ? rows-nr-1 : nr }
+    function getWsColumn(wsId) { const nc = (wsId-1)%columns; return orderRightLeft ? columns-nc-1 : nc }
+    function getWsInCell(r,c) { const wr = orderBottomUp?rows-r-1:r; const wc = orderRightLeft?columns-c-1:c; return wr*columns+wc+1 }
+    function workspaceAtPoint(px, py) {
+        const sx = workspaceImplicitWidth + workspaceSpacing
+        const sy = workspaceImplicitHeight + workspaceSpacing
+        const ci = Math.floor(px / sx), ri = Math.floor(py / sy)
+        const lx = px - ci*sx, ly = py - ri*sy
+        if (ci<0||ci>=columns||ri<0||ri>=rows||lx<0||ly<0||lx>workspaceImplicitWidth||ly>workspaceImplicitHeight) return -1
+        return workspaceGroup*workspacesShown + getWsInCell(ri,ci)
+    }
+    function workspaceOffset(wsId) {
+        const s = wsId>0?wsId:1
+        return { x:(workspaceImplicitWidth+workspaceSpacing)*getWsColumn(s), y:(workspaceImplicitHeight+workspaceSpacing)*getWsRow(s) }
+    }
+    function clamp(v,lo,hi) { const n=Number(v); return isFinite(n)?Math.max(lo,Math.min(hi,n)):lo }
+    function tWidth(md) { if(!md) return monitor?monitor.width:(screen?screen.width:1920); return (md.transform&1)?md.height:md.width }
+    function tHeight(md) { if(!md) return monitor?monitor.height:(screen?screen.height:1080); return (md.transform&1)?md.width:md.height }
+
+    function floatingWindowPosition(wt, targetWs) {
+        const sm = wt && wt.sourceMonitorData ? wt.sourceMonitorData : monitorData
+        const res = sm && sm.reserved ? sm.reserved : [0,0,0,0]
+        const mx = sm && sm.x!==undefined ? sm.x : 0
+        const my = sm && sm.y!==undefined ? sm.y : 0
+        const ux = mx+res[0], uy = my+res[1]
+        const uw = Math.max(1, tWidth(sm)-res[0]-res[2]), uh = Math.max(1, tHeight(sm)-res[1]-res[3])
+        const sx = Math.max(0.0001, wt.scale*wt.widthRatio), sy = Math.max(0.0001, wt.scale*wt.heightRatio)
+        const to = targetWs>0 ? workspaceOffset(targetWs) : { x:wt.workspaceOffsetX, y:wt.workspaceOffsetY }
+        const lx = (wt.x-to.x)/sx, ly = (wt.y-to.y)/sy
+        const ww = wt.windowData&&wt.windowData.size ? wt.windowData.size[0] : 0
+        const wh = wt.windowData&&wt.windowData.size ? wt.windowData.size[1] : 0
+        const mxX = ux+Math.max(0,uw-ww), mxY = uy+Math.max(0,uh-wh)
+        return { x:Math.round(clamp(ux+lx,ux,mxX)), y:Math.round(clamp(uy+ly,uy,mxY)) }
+    }
+
+    // ── window-address-at-point (used by overlay) ────────────
+
+    function windowAddressAtPoint(px, py) {
+        const ba = hyprlandData && hyprlandData.windowByAddress ? hyprlandData.windowByAddress : {}
+        const wm = monitorData
+        for (let i = 0; i < windowToplevels.length; i++) {
+            const tlv = windowToplevels[i]
+            const addr = normalizeToplevelAddress(tlv)
+            const wd = ba[addr] || null
+            if (!wd || !wd.workspace || !wm) continue
+            const hint = windowMoveHint(addr)
+            const wsId = hint && hint.workspace !== undefined ? hint.workspace : wd.workspace.id
+            const off = workspaceOffset(wsId > 0 ? wsId : 1)
+            const sm = findMonitorData(wd.monitor !== undefined ? wd.monitor : -1)
+            const em = sm || wm
+            const res = em.reserved ? em.reserved : [0,0,0,0]
+            const emx = em.x !== undefined ? em.x : 0
+            const emy = em.y !== undefined ? em.y : 0
+            const pos = wd.at ? wd.at : [emx, emy]
+            const ww = wm.transform&1 ? wm.height : wm.width
+            const wh = wm.transform&1 ? wm.width : wm.height
+            const mw = em.transform&1 ? em.height : em.width
+            const mh = em.transform&1 ? em.width : em.height
+            const wr = mw>0 ? (ww*em.scale)/(mw*wm.scale) : 1
+            const hr = mh>0 ? (wh*em.scale)/(mh*wm.scale) : 1
+            const tx = Math.max((pos[0]-emx-res[0])*wr*scale, 0) + off.x
+            const ty = Math.max((pos[1]-emy-res[1])*hr*scale, 0) + off.y
+            const tw = Math.max(52, (wd.size?wd.size[0]:240)*scale*wr)
+            const th = Math.max(38, (wd.size?wd.size[1]:140)*scale*hr)
+            if (px >= tx && px <= tx+tw && py >= ty && py <= ty+th) return addr
         }
-        return null;
+        return ""
     }
 
-    function getWsRow(workspaceId) {
-        const normalRow = Math.floor((workspaceId - 1) / columns) % rows;
-        return orderBottomUp ? rows - normalRow - 1 : normalRow;
+    // ── move-hint management ─────────────────────────────────
+
+    function windowMoveHint(addr) {
+        const k = String(addr||"").toLowerCase()
+        return windowMoveHints && windowMoveHints[k] ? windowMoveHints[k] : null
     }
-
-    function getWsColumn(workspaceId) {
-        const normalColumn = (workspaceId - 1) % columns;
-        return orderRightLeft ? columns - normalColumn - 1 : normalColumn;
+    function setWindowMoveHint(addr, wsId, x, y) {
+        const k = String(addr||"").toLowerCase()
+        if (k === "") return
+        const nh = {}
+        for (const ek in windowMoveHints) nh[ek] = windowMoveHints[ek]
+        const h = {}
+        if (wsId > 0) h.workspace = wsId
+        if (x !== undefined && y !== undefined) { h.x = Math.round(x); h.y = Math.round(y) }
+        nh[k] = h
+        windowMoveHints = nh
     }
-
-    function getWsInCell(rowIndex, columnIndex) {
-        const workspaceRow = orderBottomUp ? rows - rowIndex - 1 : rowIndex;
-        const workspaceColumn = orderRightLeft ? columns - columnIndex - 1 : columnIndex;
-        return workspaceRow * columns + workspaceColumn + 1;
-    }
-
-    function workspaceAtPoint(pointX, pointY) {
-        const cellSpanX = workspaceImplicitWidth + workspaceSpacing;
-        const cellSpanY = workspaceImplicitHeight + workspaceSpacing;
-        const columnIndex = Math.floor(pointX / cellSpanX);
-        const rowIndex = Math.floor(pointY / cellSpanY);
-        const localX = pointX - columnIndex * cellSpanX;
-        const localY = pointY - rowIndex * cellSpanY;
-
-        if (columnIndex < 0 || columnIndex >= columns || rowIndex < 0 || rowIndex >= rows)
-            return -1;
-        if (localX < 0 || localY < 0 || localX > workspaceImplicitWidth || localY > workspaceImplicitHeight)
-            return -1;
-
-        return workspaceGroup * workspacesShown + getWsInCell(rowIndex, columnIndex);
-    }
-
-    function workspaceOffset(workspaceId) {
-        const safeWorkspaceId = workspaceId > 0 ? workspaceId : 1;
-        return {
-            "x": (workspaceImplicitWidth + workspaceSpacing) * getWsColumn(safeWorkspaceId),
-            "y": (workspaceImplicitHeight + workspaceSpacing) * getWsRow(safeWorkspaceId)
-        };
-    }
-
-    function clampNumber(value, minimum, maximum) {
-        const parsed = Number(value);
-        if (!isFinite(parsed))
-            return minimum;
-
-        return Math.max(minimum, Math.min(maximum, parsed));
-    }
-
-    function transformedMonitorWidth(monitorData) {
-        if (!monitorData)
-            return monitor ? monitor.width : (screen ? screen.width : 1920);
-
-        return (monitorData.transform & 1) ? monitorData.height : monitorData.width;
-    }
-
-    function transformedMonitorHeight(monitorData) {
-        if (!monitorData)
-            return monitor ? monitor.height : (screen ? screen.height : 1080);
-
-        return (monitorData.transform & 1) ? monitorData.width : monitorData.height;
-    }
-
-    function floatingWindowPosition(windowTile, targetWorkspace) {
-        const sourceMonitor = windowTile && windowTile.sourceMonitorData
-            ? windowTile.sourceMonitorData
-            : monitorData;
-        const reserved = sourceMonitor && sourceMonitor.reserved
-            ? sourceMonitor.reserved
-            : [0, 0, 0, 0];
-        const monitorX = sourceMonitor && sourceMonitor.x !== undefined ? sourceMonitor.x : 0;
-        const monitorY = sourceMonitor && sourceMonitor.y !== undefined ? sourceMonitor.y : 0;
-        const usableX = monitorX + reserved[0];
-        const usableY = monitorY + reserved[1];
-        const usableWidth = Math.max(1, transformedMonitorWidth(sourceMonitor) - reserved[0] - reserved[2]);
-        const usableHeight = Math.max(1, transformedMonitorHeight(sourceMonitor) - reserved[1] - reserved[3]);
-        const scaleX = Math.max(0.0001, windowTile.scale * windowTile.widthRatio);
-        const scaleY = Math.max(0.0001, windowTile.scale * windowTile.heightRatio);
-        const targetOffset = targetWorkspace > 0
-            ? workspaceOffset(targetWorkspace)
-            : {
-                "x": windowTile.workspaceOffsetX,
-                "y": windowTile.workspaceOffsetY
-            };
-        const localX = (windowTile.x - targetOffset.x) / scaleX;
-        const localY = (windowTile.y - targetOffset.y) / scaleY;
-        const windowWidth = windowTile.windowData && windowTile.windowData.size ? windowTile.windowData.size[0] : 0;
-        const windowHeight = windowTile.windowData && windowTile.windowData.size ? windowTile.windowData.size[1] : 0;
-        const maxX = usableX + Math.max(0, usableWidth - windowWidth);
-        const maxY = usableY + Math.max(0, usableHeight - windowHeight);
-
-        return {
-            "x": Math.round(clampNumber(usableX + localX, usableX, maxX)),
-            "y": Math.round(clampNumber(usableY + localY, usableY, maxY))
-        };
-    }
-
-    function windowMoveHint(address) {
-        const key = String(address || "").toLowerCase();
-        return windowMoveHints && windowMoveHints[key] ? windowMoveHints[key] : null;
-    }
-
-    function setWindowMoveHint(address, workspaceId, x, y) {
-        const key = String(address || "").toLowerCase();
-        if (key === "")
-            return;
-
-        const nextHints = {};
-        for (const existingKey in windowMoveHints)
-            nextHints[existingKey] = windowMoveHints[existingKey];
-
-        const hint = {};
-        if (workspaceId > 0)
-            hint.workspace = workspaceId;
-        if (x !== undefined && y !== undefined) {
-            hint.x = Math.round(x);
-            hint.y = Math.round(y);
-        }
-
-        nextHints[key] = hint;
-        windowMoveHints = nextHints;
-    }
-
     function clearMatchedWindowMoveHints() {
-        const hints = windowMoveHints ? windowMoveHints : {};
-        const byAddress = hyprlandData && hyprlandData.windowByAddress
-            ? hyprlandData.windowByAddress
-            : {};
-        const nextHints = {};
-        let changed = false;
-
-        for (const key in hints) {
-            const hint = hints[key];
-            const windowData = byAddress[key] || null;
-            if (!windowData) {
-                nextHints[key] = hint;
-                continue;
-            }
-
-            const workspaceMatches = hint.workspace === undefined
-                || (windowData.workspace && windowData.workspace.id === hint.workspace);
-            const positionMatches = hint.x === undefined
-                || (windowData.at
-                    && Math.abs(windowData.at[0] - hint.x) <= 1
-                    && Math.abs(windowData.at[1] - hint.y) <= 1);
-
-            if (workspaceMatches && positionMatches) {
-                changed = true;
-                continue;
-            }
-
-            nextHints[key] = hint;
+        const hints = windowMoveHints || {}
+        const ba = hyprlandData && hyprlandData.windowByAddress ? hyprlandData.windowByAddress : {}
+        const nh = {}
+        let changed = false
+        for (const k in hints) {
+            const h = hints[k]
+            const wd = ba[k] || null
+            if (!wd) { nh[k]=h; continue }
+            const wm = h.workspace === undefined || (wd.workspace && wd.workspace.id === h.workspace)
+            const pm = h.x === undefined || (wd.at && Math.abs(wd.at[0]-h.x)<=1 && Math.abs(wd.at[1]-h.y)<=1)
+            if (wm && pm) { changed = true; continue }
+            nh[k] = h
         }
-
-        if (changed)
-            windowMoveHints = nextHints;
+        if (changed) windowMoveHints = nh
     }
 
-    function normalizeToplevelAddress(toplevel) {
-        const rawAddress = toplevel && toplevel.HyprlandToplevel
-            ? String(toplevel.HyprlandToplevel.address || "")
-            : "";
-        return rawAddress.startsWith("0x")
-            ? rawAddress.toLowerCase()
-            : ("0x" + rawAddress).toLowerCase();
-    }
+    // ── toplevel management ──────────────────────────────────
 
-    function clearWindowToplevels() {
-        windowModelRefreshTimer.stop();
-        draggingFromWorkspace = -1;
-        draggingTargetWorkspace = -1;
-        draggingAddress = "";
-        settlingAddress = "";
-        hoveredAddress = "";
-        pressedAddress = "";
-        windowMoveHints = ({});
-        _windowToplevelsSignature = "";
-        if (windowToplevels.length > 0)
-            windowToplevels = [];
+    function normalizeToplevelAddress(tlv) {
+        const ra = tlv && tlv.HyprlandToplevel ? String(tlv.HyprlandToplevel.address||"") : ""
+        return ra.startsWith("0x") ? ra.toLowerCase() : ("0x"+ra).toLowerCase()
     }
-
-    function scheduleWindowToplevelRefresh() {
-        if (!showCondition) {
-            clearWindowToplevels();
-            return;
+    function clearToplevels() {
+        refreshTimer.stop()
+        draggingFromWorkspace = -1; draggingTargetWorkspace = -1; draggingAddress = ""
+        settlingAddress = ""; hoveredAddress = ""; pressedAddress = ""
+        windowMoveHints = ({}); _toplevelSig = ""
+        if (windowToplevels.length > 0) windowToplevels = []
+    }
+    function scheduleRefresh() {
+        if (!showCondition) { clearToplevels(); return }
+        refreshTimer.restart()
+    }
+    function refreshToplevels() {
+        if (!showCondition) { clearToplevels(); return }
+        const start = workspaceGroup*workspacesShown, end = (workspaceGroup+1)*workspacesShown
+        const ba = hyprlandData && hyprlandData.windowByAddress ? hyprlandData.windowByAddress : {}
+        const next = []; let sig = ""
+        for (let i = 0; i < toplevelValues.length; i++) {
+            const tlv = toplevelValues[i]
+            const addr = normalizeToplevelAddress(tlv)
+            const wd = ba[addr] || null
+            const wsId = wd && wd.workspace ? wd.workspace.id : -1
+            if (wsId > start && wsId <= end) { next.push(tlv); sig += addr+"\x1e" }
         }
-
-        windowModelRefreshTimer.restart();
+        if (sig === _toplevelSig) return
+        _toplevelSig = sig
+        windowToplevels = next
     }
 
-    function refreshWindowToplevels() {
-        if (!showCondition) {
-            clearWindowToplevels();
-            return;
-        }
+    onShowConditionChanged: showCondition ? scheduleRefresh() : clearToplevels()
+    onWorkspaceGroupChanged: scheduleRefresh()
+    onToplevelValuesChanged: scheduleRefresh()
+    Component.onCompleted: scheduleRefresh()
 
-        const startWorkspace = workspaceGroup * workspacesShown;
-        const endWorkspace = (workspaceGroup + 1) * workspacesShown;
-        const byAddress = hyprlandData && hyprlandData.windowByAddress
-            ? hyprlandData.windowByAddress
-            : {};
-        const nextToplevels = [];
-        let nextSignature = "";
-
-        for (let index = 0; index < toplevelValues.length; index++) {
-            const toplevel = toplevelValues[index];
-            const address = normalizeToplevelAddress(toplevel);
-            const windowData = byAddress[address] || null;
-            const workspaceId = windowData && windowData.workspace ? windowData.workspace.id : -1;
-
-            if (workspaceId > startWorkspace && workspaceId <= endWorkspace) {
-                nextToplevels.push(toplevel);
-                nextSignature += address + "\u001e";
-            }
-        }
-
-        if (nextSignature === _windowToplevelsSignature)
-            return;
-
-        _windowToplevelsSignature = nextSignature;
-        windowToplevels = nextToplevels;
-    }
-
-    onShowConditionChanged: {
-        if (showCondition)
-            scheduleWindowToplevelRefresh();
-        else
-            clearWindowToplevels();
-    }
-    onWorkspaceGroupChanged: scheduleWindowToplevelRefresh()
-    onToplevelValuesChanged: scheduleWindowToplevelRefresh()
-
-    Component.onCompleted: scheduleWindowToplevelRefresh()
-
-    Timer {
-        id: windowModelRefreshTimer
-        interval: 80
-        repeat: false
-        onTriggered: root.refreshWindowToplevels()
-    }
+    Timer { id: refreshTimer; interval: 80; repeat: false; onTriggered: root.refreshToplevels() }
 
     Connections {
         target: root.hyprlandData
-
-        function onWindowByAddressChanged() {
-            root.clearMatchedWindowMoveHints();
-            root.scheduleWindowToplevelRefresh();
-        }
+        function onWindowByAddressChanged() { root.clearMatchedWindowMoveHints(); root.scheduleRefresh() }
     }
 
-    Behavior on opacity {
-        NumberAnimation {
-            duration: showCondition ? 180 : 120
-            easing.type: Easing.InOutQuad
-        }
-    }
+    // ── visual ───────────────────────────────────────────────
+
+    Behavior on opacity { NumberAnimation { duration: showCondition?180:120; easing.type: Easing.InOutQuad } }
 
     Rectangle {
         id: overviewCard
-
         anchors.centerIn: parent
-        width: implicitWidth
-        height: implicitHeight
-        implicitWidth: workspaceStage.implicitWidth + root.outerPadding * 2
-        implicitHeight: workspaceStage.implicitHeight + root.outerPadding * 2
+        width: implicitWidth; height: implicitHeight
+        implicitWidth: workspaceStage.implicitWidth + root.outerPadding*2
+        implicitHeight: workspaceStage.implicitHeight + root.outerPadding*2
         radius: root.largeWorkspaceRadius + root.outerPadding
         color: root.cardColor
-        border.width: 1
-        border.color: root.cardBorderColor
+        border.width: 1; border.color: root.cardBorderColor
 
         Rectangle {
-            anchors.fill: parent
-            anchors.margins: 1
-            radius: parent.radius - 1
-            color: StyleTokens.transparent
-            border.width: 1
-            border.color: StyleTokens.overviewInnerBorder
+            anchors.fill: parent; anchors.margins: 1
+            radius: parent.radius-1; color: StyleTokens.transparent
+            border.width: 1; border.color: StyleTokens.overviewInnerBorder
         }
 
         Item {
             id: workspaceStage
-
             anchors.centerIn: parent
-            width: implicitWidth
-            height: implicitHeight
+            width: implicitWidth; height: implicitHeight
             implicitWidth: workspaceColumnLayout.implicitWidth
             implicitHeight: workspaceColumnLayout.implicitHeight
 
+            // ── workspace cells (rendering only, no interaction) ──
+
             Column {
                 id: workspaceColumnLayout
-
-                width: implicitWidth
-                height: implicitHeight
                 spacing: root.workspaceSpacing
 
                 Repeater {
                     model: root.rows
-
                     delegate: Row {
-                        id: workspaceRow
-
+                        id: wsRow
                         required property int index
-
-                        width: implicitWidth
-                        height: implicitHeight
                         spacing: root.workspaceSpacing
-
                         Repeater {
                             model: root.columns
-
                             delegate: Rectangle {
-                                id: workspaceCell
-
+                                id: wsCell
                                 required property int index
-
-                                property int columnIndex: index
-                                property int workspaceValue: root.workspaceGroup * root.workspacesShown + root.getWsInCell(workspaceRow.index, columnIndex)
-                                property bool hoveredWhileDragging: root.draggingTargetWorkspace === workspaceValue
-                                    && root.draggingFromWorkspace !== workspaceValue
-                                property bool workspaceAtLeft: columnIndex === 0
-                                property bool workspaceAtRight: columnIndex === root.columns - 1
-                                property bool workspaceAtTop: workspaceRow.index === 0
-                                property bool workspaceAtBottom: workspaceRow.index === root.rows - 1
+                                property int col: index
+                                property int wsValue: root.workspaceGroup*root.workspacesShown + root.getWsInCell(wsRow.index, col)
+                                property bool hoveredDrag: root.draggingTargetWorkspace === wsValue && root.draggingFromWorkspace !== wsValue
+                                property bool atLeft: col === 0
+                                property bool atRight: col === root.columns-1
+                                property bool atTop: wsRow.index === 0
+                                property bool atBottom: wsRow.index === root.rows-1
 
                                 implicitWidth: root.workspaceImplicitWidth
                                 implicitHeight: root.workspaceImplicitHeight
-                                width: implicitWidth
-                                height: implicitHeight
+                                color: hoveredDrag ? root.workspaceHoverColor : root.workspaceColor
+                                topLeftRadius: atLeft&&atTop ? root.largeWorkspaceRadius : root.smallWorkspaceRadius
+                                topRightRadius: atRight&&atTop ? root.largeWorkspaceRadius : root.smallWorkspaceRadius
+                                bottomLeftRadius: atLeft&&atBottom ? root.largeWorkspaceRadius : root.smallWorkspaceRadius
+                                bottomRightRadius: atRight&&atBottom ? root.largeWorkspaceRadius : root.smallWorkspaceRadius
+                                border.width: hoveredDrag ? 2 : 1
+                                border.color: hoveredDrag ? root.workspaceBorderHoverColor : StyleTokens.workspaceCellBorder
                                 clip: true
-                                color: hoveredWhileDragging ? root.workspaceHoverColor : root.workspaceColor
-                                topLeftRadius: workspaceAtLeft && workspaceAtTop ? root.largeWorkspaceRadius : root.smallWorkspaceRadius
-                                topRightRadius: workspaceAtRight && workspaceAtTop ? root.largeWorkspaceRadius : root.smallWorkspaceRadius
-                                bottomLeftRadius: workspaceAtLeft && workspaceAtBottom ? root.largeWorkspaceRadius : root.smallWorkspaceRadius
-                                bottomRightRadius: workspaceAtRight && workspaceAtBottom ? root.largeWorkspaceRadius : root.smallWorkspaceRadius
-                                border.width: hoveredWhileDragging ? 2 : 1
-                                border.color: hoveredWhileDragging ? root.workspaceBorderHoverColor : StyleTokens.workspaceCellBorder
 
                                 ClippingRectangle {
-                                    anchors.fill: parent
-                                    anchors.margins: 1
-                                    color: StyleTokens.transparent
+                                    anchors.fill: parent; anchors.margins: 1
+                                    color: StyleTokens.transparent; antialiasing: true
                                     contentUnderBorder: true
-                                    antialiasing: true
-                                    topLeftRadius: Math.max(workspaceCell.topLeftRadius - 1, 0)
-                                    topRightRadius: Math.max(workspaceCell.topRightRadius - 1, 0)
-                                    bottomLeftRadius: Math.max(workspaceCell.bottomLeftRadius - 1, 0)
-                                    bottomRightRadius: Math.max(workspaceCell.bottomRightRadius - 1, 0)
+                                    topLeftRadius: Math.max(wsCell.topLeftRadius-1,0)
+                                    topRightRadius: Math.max(wsCell.topRightRadius-1,0)
+                                    bottomLeftRadius: Math.max(wsCell.bottomLeftRadius-1,0)
+                                    bottomRightRadius: Math.max(wsCell.bottomRightRadius-1,0)
 
                                     Image {
                                         anchors.fill: parent
@@ -466,90 +326,51 @@ Item {
                                         fillMode: Image.PreserveAspectCrop
                                         sourceSize.width: root.cachedWallpaperWidth
                                         sourceSize.height: root.cachedWallpaperHeight
-                                        asynchronous: false
-                                        cache: true
-                                        opacity: 0.92
+                                        asynchronous: false; cache: true; opacity: 0.92
                                     }
-
                                     Rectangle {
                                         anchors.fill: parent
-                                        color: hoveredWhileDragging ? StyleTokens.workspaceOverlayHover : StyleTokens.workspaceOverlay
+                                        color: hoveredDrag ? StyleTokens.workspaceOverlayHover : StyleTokens.workspaceOverlay
                                     }
 
                                     Item {
                                         anchors.fill: parent
-
                                         Repeater {
                                             model: root.windowToplevels
-
                                             delegate: WorkspaceOverviewWindow {
-                                                id: clippedWindowTile
-
+                                                id: clippedTile
                                                 required property var modelData
-
-                                                readonly property string address: {
-                                                    const rawAddress = modelData && modelData.HyprlandToplevel
-                                                        ? String(modelData.HyprlandToplevel.address || "")
-                                                        : "";
-                                                    return rawAddress.startsWith("0x")
-                                                        ? rawAddress.toLowerCase()
-                                                        : ("0x" + rawAddress).toLowerCase();
+                                                readonly property string addr: {
+                                                    const ra = modelData&&modelData.HyprlandToplevel ? String(modelData.HyprlandToplevel.address||"") : ""
+                                                    return ra.startsWith("0x") ? ra.toLowerCase() : ("0x"+ra).toLowerCase()
                                                 }
-                                                readonly property var visualWindowData: root.hyprlandData && root.hyprlandData.windowByAddress
-                                                    ? root.hyprlandData.windowByAddress[address]
-                                                    : null
-                                                readonly property var moveHint: root.windowMoveHint(address)
-                                                readonly property int workspaceId: moveHint && moveHint.workspace !== undefined
-                                                    ? moveHint.workspace
-                                                    : (visualWindowData && visualWindowData.workspace ? visualWindowData.workspace.id : -1)
-                                                readonly property var positionHint: moveHint && moveHint.x !== undefined && moveHint.y !== undefined
-                                                    ? moveHint
-                                                    : null
-                                                property int monitorId: visualWindowData && visualWindowData.monitor !== undefined ? visualWindowData.monitor : -1
-                                                property var sourceMonitorData: root.findMonitorData(monitorId)
-                                                property real distanceFromLeftEdge: Math.max(initX, 0)
-                                                property real distanceFromRightEdge: Math.max(root.workspaceImplicitWidth - (initX + targetWindowWidth), 0)
-                                                property real distanceFromTopEdge: Math.max(initY, 0)
-                                                property real distanceFromBottomEdge: Math.max(root.workspaceImplicitHeight - (initY + targetWindowHeight), 0)
-
-                                                visible: workspaceId === workspaceCell.workspaceValue
-                                                windowData: visualWindowData
-                                                toplevel: modelData
+                                                readonly property var vwd: root.hyprlandData&&root.hyprlandData.windowByAddress ? root.hyprlandData.windowByAddress[addr] : null
+                                                readonly property var mh: root.windowMoveHint(addr)
+                                                readonly property int wsId: mh&&mh.workspace!==undefined ? mh.workspace : (vwd&&vwd.workspace ? vwd.workspace.id : -1)
+                                                readonly property var ph: mh&&mh.x!==undefined&&mh.y!==undefined ? mh : null
+                                                property int monId: vwd&&vwd.monitor!==undefined ? vwd.monitor : -1
+                                                property var srcMon: root.findMonitorData(monId)
+                                                property real distL: Math.max(initX,0)
+                                                property real distR: Math.max(root.workspaceImplicitWidth-(initX+targetWindowWidth),0)
+                                                property real distT: Math.max(initY,0)
+                                                property real distB: Math.max(root.workspaceImplicitHeight-(initY+targetWindowHeight),0)
+                                                visible: wsId === wsCell.wsValue
+                                                windowData: vwd; toplevel: modelData
                                                 previewEnabled: root.previewsEnabled
-                                                forcePreviewActive: root.previewsEnabled
-                                                    && (address === root.draggingAddress || address === root.settlingAddress)
-                                                positionOverride: positionHint
-                                                scale: root.scale
-                                                monitorData: sourceMonitorData ? sourceMonitorData : root.monitorData
-                                                widgetMonitor: root.monitorData
-                                                xOffset: 0
-                                                yOffset: 0
-                                                centerIcons: root.centerIcons
-                                                visibilityOpacity: address === root.draggingAddress || address === root.settlingAddress ? 0 : 1
-                                                hovered: root.hoveredAddress === address
-                                                pressed: root.pressedAddress === address
-                                                topLeftRadius: Math.max((workspaceCell.workspaceAtLeft && workspaceCell.workspaceAtTop ? root.largeWorkspaceRadius : root.smallWorkspaceRadius) - Math.max(distanceFromLeftEdge, distanceFromTopEdge), root.windowCornerRadius)
-                                                topRightRadius: Math.max((workspaceCell.workspaceAtRight && workspaceCell.workspaceAtTop ? root.largeWorkspaceRadius : root.smallWorkspaceRadius) - Math.max(distanceFromRightEdge, distanceFromTopEdge), root.windowCornerRadius)
-                                                bottomLeftRadius: Math.max((workspaceCell.workspaceAtLeft && workspaceCell.workspaceAtBottom ? root.largeWorkspaceRadius : root.smallWorkspaceRadius) - Math.max(distanceFromLeftEdge, distanceFromBottomEdge), root.windowCornerRadius)
-                                                bottomRightRadius: Math.max((workspaceCell.workspaceAtRight && workspaceCell.workspaceAtBottom ? root.largeWorkspaceRadius : root.smallWorkspaceRadius) - Math.max(distanceFromRightEdge, distanceFromBottomEdge), root.windowCornerRadius)
-                                                z: (visualWindowData && visualWindowData.fullscreen ? 30 : 20) + (visualWindowData && visualWindowData.floating ? 5 : 0)
+                                                forcePreviewActive: root.previewsEnabled && (addr===root.draggingAddress||addr===root.settlingAddress)
+                                                positionOverride: ph; scale: root.scale
+                                                monitorData: srcMon||root.monitorData; widgetMonitor: root.monitorData
+                                                xOffset: 0; yOffset: 0; centerIcons: root.centerIcons
+                                                visibilityOpacity: addr===root.draggingAddress||addr===root.settlingAddress ? 0 : 1
+                                                hovered: root.hoveredAddress===addr
+                                                pressed: root.pressedAddress===addr
+                                                topLeftRadius: Math.max((wsCell.atLeft&&wsCell.atTop?root.largeWorkspaceRadius:root.smallWorkspaceRadius)-Math.max(distL,distT), root.windowCornerRadius)
+                                                topRightRadius: Math.max((wsCell.atRight&&wsCell.atTop?root.largeWorkspaceRadius:root.smallWorkspaceRadius)-Math.max(distR,distT), root.windowCornerRadius)
+                                                bottomLeftRadius: Math.max((wsCell.atLeft&&wsCell.atBottom?root.largeWorkspaceRadius:root.smallWorkspaceRadius)-Math.max(distL,distB), root.windowCornerRadius)
+                                                bottomRightRadius: Math.max((wsCell.atRight&&wsCell.atBottom?root.largeWorkspaceRadius:root.smallWorkspaceRadius)-Math.max(distR,distB), root.windowCornerRadius)
+                                                z: (vwd&&vwd.fullscreen?30:20)+(vwd&&vwd.floating?5:0)
                                             }
                                         }
-                                    }
-                                }
-
-                                MouseArea {
-                                    anchors.fill: parent
-                                    acceptedButtons: root.workspaceOverviewCellAcceptedButtons
-
-                                    onPressed: (mouse) => {
-                                        if (mouse.button !== Qt.LeftButton)
-                                            return;
-                                        if (root.draggingFromWorkspace !== -1)
-                                            return;
-
-                                        root.closeRequested();
-                                        hyprDispatch.focusWorkspace(workspaceCell.workspaceValue);
                                     }
                                 }
                             }
@@ -558,394 +379,229 @@ Item {
                 }
             }
 
+            // ── windowSpace: draggable tiles + overlay ────────
+
             Item {
                 id: windowSpace
-
                 anchors.fill: workspaceColumnLayout
+
+                // ── overlay: single entry-point for all clicks ──
+
+                MouseArea {
+                    id: overlay
+                    anchors.fill: parent
+                    acceptedButtons: Qt.LeftButton | Qt.RightButton
+                    hoverEnabled: true
+
+                    onPressed: (mouse) => {
+                        const dragBtn = userConfig.mouseButton(userConfig.workspaceOverviewWindowDragButton)
+                        const addr = root.windowAddressAtPoint(mouse.x, mouse.y)
+                        if (mouse.button === dragBtn && addr !== "") {
+                            mouse.accepted = false
+                            return
+                        }
+                        if (root.draggingFromWorkspace !== -1) return
+
+                        if (mouse.button === Qt.LeftButton && addr !== "") {
+                            root.closeRequested()
+                            hyprDispatch.focusWindow(addr)
+                        } else if (mouse.button === Qt.RightButton && addr !== "") {
+                            hyprDispatch.closeWindow(addr)
+                        } else if (mouse.button === Qt.LeftButton) {
+                            const ws = root.workspaceAtPoint(mouse.x, mouse.y)
+                            if (ws !== -1) { root.closeRequested(); hyprDispatch.focusWorkspace(ws) }
+                        }
+                    }
+                    onPositionChanged: {
+                        root.hoveredAddress = containsMouse ? root.windowAddressAtPoint(mouseX, mouseY) : ""
+                    }
+                    onContainsMouseChanged: { if (!containsMouse) root.hoveredAddress = "" }
+                }
+
+                // ── draggable window tiles (drag only) ─────────
 
                 Repeater {
                     model: root.windowToplevels
-
                     delegate: WorkspaceOverviewWindow {
-                        id: windowTile
-
+                        id: dragTile
                         required property var modelData
-
-                        readonly property string address: {
-                            const rawAddress = modelData && modelData.HyprlandToplevel
-                                ? String(modelData.HyprlandToplevel.address || "")
-                                : "";
-                            return rawAddress.startsWith("0x")
-                                ? rawAddress.toLowerCase()
-                                : ("0x" + rawAddress).toLowerCase();
+                        readonly property string addr: {
+                            const ra = modelData&&modelData.HyprlandToplevel ? String(modelData.HyprlandToplevel.address||"") : ""
+                            return ra.startsWith("0x") ? ra.toLowerCase() : ("0x"+ra).toLowerCase()
                         }
-                        readonly property var moveHint: root.windowMoveHint(address)
-                        readonly property int workspaceId: moveHint && moveHint.workspace !== undefined
-                            ? moveHint.workspace
-                            : (windowData && windowData.workspace ? windowData.workspace.id : -1)
-                        readonly property var positionHint: moveHint && moveHint.x !== undefined && moveHint.y !== undefined
-                            ? moveHint
-                            : null
-                        property int monitorId: windowData && windowData.monitor !== undefined ? windowData.monitor : -1
-                        property var sourceMonitorData: root.findMonitorData(monitorId)
-                        property int workspaceRowIndex: root.getWsRow(workspaceId > 0 ? workspaceId : 1)
-                        property int workspaceColumnIndex: root.getWsColumn(workspaceId > 0 ? workspaceId : 1)
-                        property real workspaceOffsetX: (root.workspaceImplicitWidth + root.workspaceSpacing) * workspaceColumnIndex
-                        property real workspaceOffsetY: (root.workspaceImplicitHeight + root.workspaceSpacing) * workspaceRowIndex
-                        property real distanceFromLeftEdge: Math.max(initX - workspaceOffsetX, 0)
-                        property real distanceFromRightEdge: Math.max(root.workspaceImplicitWidth - ((initX - workspaceOffsetX) + targetWindowWidth), 0)
-                        property real distanceFromTopEdge: Math.max(initY - workspaceOffsetY, 0)
-                        property real distanceFromBottomEdge: Math.max(root.workspaceImplicitHeight - ((initY - workspaceOffsetY) + targetWindowHeight), 0)
-                        property bool workspaceAtLeft: workspaceColumnIndex === 0
-                        property bool workspaceAtRight: workspaceColumnIndex === root.columns - 1
-                        property bool workspaceAtTop: workspaceRowIndex === 0
-                        property bool workspaceAtBottom: workspaceRowIndex === root.rows - 1
-                        property bool settlingAfterDrop: false
-                        property int settleTargetWorkspace: -1
-                        property real lastDragMouseX: 0
-                        property real lastDragMouseY: 0
+                        readonly property var mh: root.windowMoveHint(addr)
+                        readonly property int wsId: mh&&mh.workspace!==undefined ? mh.workspace : (windowData&&windowData.workspace ? windowData.workspace.id : -1)
+                        readonly property var ph: mh&&mh.x!==undefined&&mh.y!==undefined ? mh : null
+                        property int monId: windowData&&windowData.monitor!==undefined ? windowData.monitor : -1
+                        property var srcMon: root.findMonitorData(monId)
+                        property int wsRow: root.getWsRow(wsId>0?wsId:1)
+                        property int wsCol: root.getWsColumn(wsId>0?wsId:1)
+                        property real offX: (root.workspaceImplicitWidth+root.workspaceSpacing)*wsCol
+                        property real offY: (root.workspaceImplicitHeight+root.workspaceSpacing)*wsRow
+                        property real distL: Math.max(initX-offX,0)
+                        property real distR: Math.max(root.workspaceImplicitWidth-((initX-offX)+targetWindowWidth),0)
+                        property real distT: Math.max(initY-offY,0)
+                        property real distB: Math.max(root.workspaceImplicitHeight-((initY-offY)+targetWindowHeight),0)
+                        property bool atL: wsCol===0; property bool atR: wsCol===root.columns-1
+                        property bool atT: wsRow===0; property bool atB: wsRow===root.rows-1
+                        property bool settling: false
+                        property int settleTarget: -1
+                        property real lastMouseX: 0
+                        property real lastMouseY: 0
 
-                        windowData: root.hyprlandData && root.hyprlandData.windowByAddress
-                            ? root.hyprlandData.windowByAddress[address]
-                            : null
+                        windowData: root.hyprlandData&&root.hyprlandData.windowByAddress ? root.hyprlandData.windowByAddress[addr] : null
                         toplevel: modelData
                         previewEnabled: root.previewsEnabled
-                        forcePreviewActive: root.previewsEnabled
-                            && (dragArea.containsMouse || dragArea.pressed || Drag.active || settlingAfterDrop)
-                        positionOverride: positionHint
-                        visible: workspaceId > root.workspaceGroup * root.workspacesShown
-                            && workspaceId <= (root.workspaceGroup + 1) * root.workspacesShown
+                        forcePreviewActive: root.previewsEnabled && (drag.containsMouse||drag.pressed||Drag.active||settling)
+                        positionOverride: ph
+                        visible: wsId>root.workspaceGroup*root.workspacesShown && wsId<=(root.workspaceGroup+1)*root.workspacesShown
                         scale: root.scale
-                        monitorData: sourceMonitorData ? sourceMonitorData : root.monitorData
-                        widgetMonitor: root.monitorData
-                        xOffset: workspaceOffsetX
-                        yOffset: workspaceOffsetY
-                        centerIcons: root.centerIcons
+                        monitorData: srcMon||root.monitorData; widgetMonitor: root.monitorData
+                        xOffset: offX; yOffset: offY; centerIcons: root.centerIcons
                         draggingActive: Drag.active
-                        visibilityOpacity: Drag.active || settlingAfterDrop ? 1 : 0
-                        pressed: dragArea.pressed
-                        hovered: dragArea.containsMouse
-                        topLeftRadius: Math.max((workspaceAtLeft && workspaceAtTop ? root.largeWorkspaceRadius : root.smallWorkspaceRadius) - Math.max(distanceFromLeftEdge, distanceFromTopEdge), root.windowCornerRadius)
-                        topRightRadius: Math.max((workspaceAtRight && workspaceAtTop ? root.largeWorkspaceRadius : root.smallWorkspaceRadius) - Math.max(distanceFromRightEdge, distanceFromTopEdge), root.windowCornerRadius)
-                        bottomLeftRadius: Math.max((workspaceAtLeft && workspaceAtBottom ? root.largeWorkspaceRadius : root.smallWorkspaceRadius) - Math.max(distanceFromLeftEdge, distanceFromBottomEdge), root.windowCornerRadius)
-                        bottomRightRadius: Math.max((workspaceAtRight && workspaceAtBottom ? root.largeWorkspaceRadius : root.smallWorkspaceRadius) - Math.max(distanceFromRightEdge, distanceFromBottomEdge), root.windowCornerRadius)
-                        z: Drag.active ? 99999 : (windowData && windowData.fullscreen ? 30 : 20) + (windowData && windowData.floating ? 5 : 0)
+                        visibilityOpacity: Drag.active||settling ? 1 : 0
+                        pressed: drag.pressed; hovered: drag.containsMouse
+                        topLeftRadius: Math.max((atL&&atT?root.largeWorkspaceRadius:root.smallWorkspaceRadius)-Math.max(distL,distT), root.windowCornerRadius)
+                        topRightRadius: Math.max((atR&&atT?root.largeWorkspaceRadius:root.smallWorkspaceRadius)-Math.max(distR,distT), root.windowCornerRadius)
+                        bottomLeftRadius: Math.max((atL&&atB?root.largeWorkspaceRadius:root.smallWorkspaceRadius)-Math.max(distL,distB), root.windowCornerRadius)
+                        bottomRightRadius: Math.max((atR&&atB?root.largeWorkspaceRadius:root.smallWorkspaceRadius)-Math.max(distR,distB), root.windowCornerRadius)
+                        z: Drag.active?99999:(windowData&&windowData.fullscreen?30:20)+(windowData&&windowData.floating?5:0)
 
-                        Timer {
-                            id: restoreTilePosition
+                        // ── settle helpers ──
 
-                            interval: 80
-                            repeat: false
-
+                        Timer { id: restoreTimer; interval:80; repeat:false; onTriggered:{ dragTile.x=Math.round(dragTile.initX); dragTile.y=Math.round(dragTile.initY) } }
+                        Timer { id: settleTimer; interval:700; repeat:false
                             onTriggered: {
-                                windowTile.x = Math.round(windowTile.initX);
-                                windowTile.y = Math.round(windowTile.initY);
+                                if (!dragTile.settling||finishTimer.running) return
+                                const o = root.workspaceOffset(dragTile.settleTarget)
+                                const mx = o.x+Math.max(0,root.workspaceImplicitWidth-dragTile.width)
+                                const my = o.y+Math.max(0,root.workspaceImplicitHeight-dragTile.height)
+                                dragTile.x = Math.round(root.clamp(dragTile.x,o.x,mx))
+                                dragTile.y = Math.round(root.clamp(dragTile.y,o.y,my))
+                                finishTimer.restart()
                             }
                         }
+                        Timer { id: finishTimer; interval:230; repeat:false; onTriggered: finishSettle() }
 
-                        Timer {
-                            id: settleFallbackTimer
-
-                            interval: 700
-                            repeat: false
-
-                            onTriggered: {
-                                if (!windowTile.settlingAfterDrop || settleFinishTimer.running)
-                                    return;
-
-                                const offset = root.workspaceOffset(windowTile.settleTargetWorkspace);
-                                const maxX = offset.x + Math.max(0, root.workspaceImplicitWidth - windowTile.width);
-                                const maxY = offset.y + Math.max(0, root.workspaceImplicitHeight - windowTile.height);
-                                windowTile.x = Math.round(root.clampNumber(windowTile.x, offset.x, maxX));
-                                windowTile.y = Math.round(root.clampNumber(windowTile.y, offset.y, maxY));
-                                settleFinishTimer.restart();
-                            }
+                        function beginSettle(ws) { restoreTimer.stop(); settleTimer.stop(); finishTimer.stop(); settleTarget=ws; settling=true; root.settlingAddress=addr; settleTimer.restart() }
+                        function maybeSettle() {
+                            if (!settling||finishTimer.running||wsId!==settleTarget) return
+                            settleTimer.stop(); x=Math.round(initX); y=Math.round(initY); finishTimer.restart()
                         }
-
-                        Timer {
-                            id: settleFinishTimer
-
-                            interval: 230
-                            repeat: false
-
-                            onTriggered: windowTile.finishSettle()
+                        function finishSettle() { settleTimer.stop(); finishTimer.stop(); settling=false; settleTarget=-1; if(root.settlingAddress===addr) root.settlingAddress=""; x=Math.round(initX); y=Math.round(initY) }
+                        function inWorkspace(lx,ly) {
+                            const px=x+lx, py=y+ly
+                            return px>=offX&&px<=offX+root.workspaceImplicitWidth&&py>=offY&&py<=offY+root.workspaceImplicitHeight
                         }
+                        onWsIdChanged: maybeSettle(); onInitXChanged: maybeSettle(); onInitYChanged: maybeSettle()
 
-                        function beginSettle(targetWorkspace) {
-                            restoreTilePosition.stop();
-                            settleFallbackTimer.stop();
-                            settleFinishTimer.stop();
-                            settleTargetWorkspace = targetWorkspace;
-                            settlingAfterDrop = true;
-                            root.settlingAddress = address;
-                            settleFallbackTimer.restart();
-                        }
-
-                        function maybeSettleToCurrentInit() {
-                            if (!settlingAfterDrop || settleFinishTimer.running)
-                                return;
-                            if (workspaceId !== settleTargetWorkspace)
-                                return;
-
-                            settleFallbackTimer.stop();
-                            x = Math.round(initX);
-                            y = Math.round(initY);
-                            settleFinishTimer.restart();
-                        }
-
-                        function finishSettle() {
-                            settleFallbackTimer.stop();
-                            settleFinishTimer.stop();
-                            settlingAfterDrop = false;
-                            settleTargetWorkspace = -1;
-                            if (root.settlingAddress === address)
-                                root.settlingAddress = "";
-                            x = Math.round(initX);
-                            y = Math.round(initY);
-                        }
-
-                        function pointInsideWorkspace(localX, localY) {
-                            const pointX = x + localX;
-                            const pointY = y + localY;
-                            return pointX >= workspaceOffsetX
-                                && pointX <= workspaceOffsetX + root.workspaceImplicitWidth
-                                && pointY >= workspaceOffsetY
-                                && pointY <= workspaceOffsetY + root.workspaceImplicitHeight;
-                        }
-
-                        onWorkspaceIdChanged: maybeSettleToCurrentInit()
-                        onInitXChanged: maybeSettleToCurrentInit()
-                        onInitYChanged: maybeSettleToCurrentInit()
-
-                        Drag.hotSpot.x: width / 2
-                        Drag.hotSpot.y: height / 2
+                        Drag.hotSpot.x: width/2
+                        Drag.hotSpot.y: height/2
 
                         MouseArea {
-                            id: dragArea
-
+                            id: drag
                             anchors.fill: parent
                             hoverEnabled: true
-                            acceptedButtons: root.workspaceOverviewWindowAcceptedButtons
+                            acceptedButtons: userConfig.mouseButtonsMask([userConfig.workspaceOverviewWindowDragButton])
                             drag.target: draggingWindow ? parent : null
-
-                            property bool movedWindow: false
+                            property bool moved: false
                             property bool draggingWindow: false
 
                             onPressed: (mouse) => {
-                                if (!windowTile.pointInsideWorkspace(mouse.x, mouse.y))
-                                    return;
-
-                                root.pressedAddress = windowTile.address;
-                                if (mouse.button !== userConfig.mouseButton(userConfig.workspaceOverviewWindowDragButton))
-                                    return;
-
-                                movedWindow = false;
-                                draggingWindow = true;
-                                root.draggingAddress = windowTile.address;
-                                if (root.settlingAddress === windowTile.address)
-                                    root.settlingAddress = "";
-                                root.draggingFromWorkspace = windowTile.windowData && windowTile.windowData.workspace
-                                    ? windowTile.windowData.workspace.id
-                                    : -1;
-                                windowTile.Drag.active = true;
-                                windowTile.Drag.source = windowTile;
-                                windowTile.Drag.hotSpot.x = mouse.x;
-                                windowTile.Drag.hotSpot.y = mouse.y;
+                                if (!dragTile.inWorkspace(mouse.x,mouse.y)) return
+                                root.pressedAddress = dragTile.addr
+                                if (mouse.button !== userConfig.mouseButton(userConfig.workspaceOverviewWindowDragButton)) return
+                                moved = false; draggingWindow = true
+                                dragTile.lastMouseX = dragTile.x + mouse.x
+                                dragTile.lastMouseY = dragTile.y + mouse.y
+                                root.draggingAddress = dragTile.addr
+                                if (root.settlingAddress===dragTile.addr) root.settlingAddress=""
+                                root.draggingFromWorkspace = dragTile.windowData&&dragTile.windowData.workspace ? dragTile.windowData.workspace.id : -1
+                                dragTile.Drag.active = true; dragTile.Drag.source = dragTile
+                                dragTile.Drag.hotSpot.x = mouse.x; dragTile.Drag.hotSpot.y = mouse.y
                             }
-
                             onPositionChanged: {
-                                syncHover();
-
-                                if (!draggingWindow || !(pressedButtons & userConfig.mouseButton(userConfig.workspaceOverviewWindowDragButton)))
-                                    return;
-
-                                windowTile.lastDragMouseX = windowTile.x + mouseX;
-                                windowTile.lastDragMouseY = windowTile.y + mouseY;
-
-                                const isFloating = windowTile.windowData && windowTile.windowData.floating;
-                                if (!isFloating)
-                                    root.draggingTargetWorkspace = root.workspaceAtPoint(
-                                        windowTile.lastDragMouseX,
-                                        windowTile.lastDragMouseY
-                                    );
+                                if (!draggingWindow) return
+                                dragTile.lastMouseX = dragTile.x + mouseX
+                                dragTile.lastMouseY = dragTile.y + mouseY
+                                if (dragTile.windowData && !dragTile.windowData.floating)
+                                    root.draggingTargetWorkspace = root.workspaceAtPoint(dragTile.lastMouseX, dragTile.lastMouseY)
                                 else
-                                    root.draggingTargetWorkspace = root.workspaceAtPoint(
-                                        windowTile.x + windowTile.width / 2,
-                                        windowTile.y + windowTile.height / 2
-                                    );
-
-                                if (!movedWindow) {
-                                    movedWindow = Math.abs(windowTile.x - windowTile.initX) > 4
-                                        || Math.abs(windowTile.y - windowTile.initY) > 4;
-                                }
+                                    root.draggingTargetWorkspace = root.workspaceAtPoint(dragTile.x+dragTile.width/2, dragTile.y+dragTile.height/2)
+                                if (!moved) moved = Math.abs(dragTile.x-dragTile.initX)>4||Math.abs(dragTile.y-dragTile.initY)>4
                             }
-
                             onReleased: {
-                                if (root.pressedAddress === windowTile.address)
-                                    root.pressedAddress = "";
-                                if (!draggingWindow)
-                                    return;
+                                if (root.pressedAddress===dragTile.addr) root.pressedAddress=""
+                                if (!draggingWindow) return
+                                draggingWindow = false
+                                const isFloating = dragTile.windowData && dragTile.windowData.floating
+                                let targetWs
+                                if (isFloating) targetWs = root.workspaceAtPoint(dragTile.x+dragTile.width/2, dragTile.y+dragTile.height/2)
+                                else { targetWs = root.workspaceAtPoint(dragTile.lastMouseX, dragTile.lastMouseY); if (targetWs===-1) targetWs = root.workspaceAtPoint(dragTile.x+dragTile.width/2, dragTile.y+dragTile.height/2) }
+                                const moveWs = targetWs!==-1 && dragTile.windowData && dragTile.windowData.workspace && targetWs!==dragTile.windowData.workspace.id
+                                const moveFl = !moveWs && moved && isFloating
 
-                                draggingWindow = false;
+                                dragTile.Drag.active = false
 
-                                const isFloating = windowTile.windowData && windowTile.windowData.floating;
-                                let targetWorkspace;
-                                if (isFloating) {
-                                    targetWorkspace = root.workspaceAtPoint(
-                                        windowTile.x + windowTile.width / 2,
-                                        windowTile.y + windowTile.height / 2
-                                    );
-                                } else {
-                                    targetWorkspace = root.workspaceAtPoint(
-                                        windowTile.lastDragMouseX,
-                                        windowTile.lastDragMouseY
-                                    );
-                                    if (targetWorkspace === -1)
-                                        targetWorkspace = root.workspaceAtPoint(
-                                            windowTile.x + windowTile.width / 2,
-                                            windowTile.y + windowTile.height / 2
-                                        );
+                                if (moveWs) {
+                                    if (isFloating) { const dp = root.floatingWindowPosition(dragTile, targetWs); root.setWindowMoveHint(dragTile.addr, targetWs, dp.x, dp.y) }
+                                    else root.setWindowMoveHint(dragTile.addr, targetWs)
+                                    dragTile.beginSettle(targetWs)
+                                } else if (moveFl) {
+                                    const dp = root.floatingWindowPosition(dragTile, dragTile.wsId)
+                                    root.setWindowMoveHint(dragTile.addr, dragTile.wsId, dp.x, dp.y)
+                                    dragTile.beginSettle(dragTile.wsId)
                                 }
 
-                                const movingToWorkspace = targetWorkspace !== -1
-                                    && windowTile.windowData
-                                    && windowTile.windowData.workspace
-                                    && targetWorkspace !== windowTile.windowData.workspace.id;
-                                const movingFloating = !movingToWorkspace
-                                    && movedWindow
-                                    && windowTile.windowData
-                                    && windowTile.windowData.floating;
-
-                                windowTile.Drag.active = false;
-
-                                if (movingToWorkspace) {
-                                    if (isFloating) {
-                                        const dropPosition = root.floatingWindowPosition(windowTile, targetWorkspace);
-                                        root.setWindowMoveHint(windowTile.address, targetWorkspace, dropPosition.x, dropPosition.y);
-                                    } else {
-                                        root.setWindowMoveHint(windowTile.address, targetWorkspace);
-                                    }
-                                    windowTile.beginSettle(targetWorkspace);
-                                } else if (movingFloating) {
-                                    const dropPosition = root.floatingWindowPosition(windowTile, windowTile.workspaceId);
-                                    root.setWindowMoveHint(windowTile.address, windowTile.workspaceId, dropPosition.x, dropPosition.y);
-                                    windowTile.beginSettle(windowTile.workspaceId);
+                                if (moveWs && !isFloating) {
+                                    const to = root.workspaceOffset(targetWs)
+                                    const vx = root.clamp(dragTile.x, to.x, to.x+Math.max(0,root.workspaceImplicitWidth-dragTile.width))
+                                    const vy = root.clamp(dragTile.y, to.y, to.y+Math.max(0,root.workspaceImplicitHeight-dragTile.height))
+                                    dragTile.x = vx; dragTile.y = vy
                                 }
 
-                                if (movingToWorkspace && !isFloating) {
-                                    const targetOffset = root.workspaceOffset(targetWorkspace);
-                                    const visualX = root.clampNumber(
-                                        windowTile.x,
-                                        targetOffset.x,
-                                        targetOffset.x + Math.max(0, root.workspaceImplicitWidth - windowTile.width)
-                                    );
-                                    const visualY = root.clampNumber(
-                                        windowTile.y,
-                                        targetOffset.y,
-                                        targetOffset.y + Math.max(0, root.workspaceImplicitHeight - windowTile.height)
-                                    );
-                                    windowTile.x = visualX;
-                                    windowTile.y = visualY;
-                                }
-
-                                root.draggingFromWorkspace = -1;
-                                root.draggingTargetWorkspace = -1;
-                                if (root.draggingAddress === windowTile.address)
-                                    root.draggingAddress = "";
-
-                                if (movingToWorkspace) {
-                                    hyprDispatch.moveWindowToWorkspace(windowTile.address, targetWorkspace, false);
-                                    if (isFloating) {
-                                        const dropPosition = root.floatingWindowPosition(windowTile, targetWorkspace);
-                                        hyprDispatch.moveWindowToPosition(windowTile.address, dropPosition.x, dropPosition.y, false);
-                                    }
-                                } else if (movingFloating) {
-                                    const dropPosition = root.floatingWindowPosition(windowTile, windowTile.workspaceId);
-                                    hyprDispatch.moveWindowToPosition(windowTile.address, dropPosition.x, dropPosition.y, false);
-                                } else {
-                                    restoreTilePosition.restart();
-                                }
+                                root.draggingFromWorkspace = -1; root.draggingTargetWorkspace = -1
+                                if (root.draggingAddress===dragTile.addr) root.draggingAddress=""
+                                if (moveWs) {
+                                    hyprDispatch.moveWindowToWorkspace(dragTile.addr, targetWs, false)
+                                    if (isFloating) { const dp = root.floatingWindowPosition(dragTile, targetWs); hyprDispatch.moveWindowToPosition(dragTile.addr, dp.x, dp.y, false) }
+                                } else if (moveFl) {
+                                    const dp = root.floatingWindowPosition(dragTile, dragTile.wsId)
+                                    hyprDispatch.moveWindowToPosition(dragTile.addr, dp.x, dp.y, false)
+                                } else if (!moved) {
+                                    root.closeRequested()
+                                    hyprDispatch.focusWindow(dragTile.addr)
+                                    restoreTimer.restart()
+                                } else restoreTimer.restart()
                             }
-
                             onCanceled: {
-                                draggingWindow = false;
-                                windowTile.Drag.active = false;
-                                root.draggingFromWorkspace = -1;
-                                root.draggingTargetWorkspace = -1;
-                                if (root.draggingAddress === windowTile.address)
-                                    root.draggingAddress = "";
-                                if (root.pressedAddress === windowTile.address)
-                                    root.pressedAddress = "";
-                                restoreTilePosition.restart();
-                            }
-
-                            onClicked: (mouse) => {
-                                if (!windowTile.windowData)
-                                    return;
-                                if (movedWindow) {
-                                    movedWindow = false;
-                                    return;
-                                }
-
-                                if (mouse.button === Qt.LeftButton) {
-                                    root.closeRequested();
-                                    hyprDispatch.focusWindow(windowTile.address);
-                                    mouse.accepted = true;
-                                } else if (mouse.button === Qt.RightButton) {
-                                    hyprDispatch.closeWindow(windowTile.address);
-                                    mouse.accepted = true;
-                                }
-                            }
-
-                            onContainsMouseChanged: {
-                                syncHover();
-                            }
-
-                            function syncHover() {
-                                if (containsMouse && windowTile.pointInsideWorkspace(mouseX, mouseY))
-                                    root.hoveredAddress = windowTile.address;
-                                else if (root.hoveredAddress === windowTile.address)
-                                    root.hoveredAddress = "";
+                                draggingWindow = false; dragTile.Drag.active = false
+                                root.draggingFromWorkspace = -1; root.draggingTargetWorkspace = -1
+                                if (root.draggingAddress===dragTile.addr) root.draggingAddress=""
+                                if (root.pressedAddress===dragTile.addr) root.pressedAddress=""
+                                restoreTimer.restart()
                             }
                         }
                     }
                 }
 
+                // ── focused workspace indicator ─────────────────
+
                 Rectangle {
-                    id: focusedWorkspaceIndicator
-
-                    property int rowIndex: root.getWsRow(root.effectiveActiveWorkspaceId)
-                    property int columnIndex: root.getWsColumn(root.effectiveActiveWorkspaceId)
-                    property bool workspaceAtLeft: columnIndex === 0
-                    property bool workspaceAtRight: columnIndex === root.columns - 1
-                    property bool workspaceAtTop: rowIndex === 0
-                    property bool workspaceAtBottom: rowIndex === root.rows - 1
-
-                    x: (root.workspaceImplicitWidth + root.workspaceSpacing) * columnIndex
-                    y: (root.workspaceImplicitHeight + root.workspaceSpacing) * rowIndex
-                    width: root.workspaceImplicitWidth
-                    height: root.workspaceImplicitHeight
+                    id: focusInd
+                    property int ri: root.getWsRow(root.effectiveActiveWorkspaceId)
+                    property int ci: root.getWsColumn(root.effectiveActiveWorkspaceId)
+                    x: (root.workspaceImplicitWidth+root.workspaceSpacing)*ci
+                    y: (root.workspaceImplicitHeight+root.workspaceSpacing)*ri
+                    width: root.workspaceImplicitWidth; height: root.workspaceImplicitHeight
                     color: StyleTokens.transparent
-                    border.width: 2
-                    border.color: root.activeBorderColor
-                    topLeftRadius: workspaceAtLeft && workspaceAtTop ? root.largeWorkspaceRadius : root.smallWorkspaceRadius
-                    topRightRadius: workspaceAtRight && workspaceAtTop ? root.largeWorkspaceRadius : root.smallWorkspaceRadius
-                    bottomLeftRadius: workspaceAtLeft && workspaceAtBottom ? root.largeWorkspaceRadius : root.smallWorkspaceRadius
-                    bottomRightRadius: workspaceAtRight && workspaceAtBottom ? root.largeWorkspaceRadius : root.smallWorkspaceRadius
-
-                    Behavior on x {
-                        NumberAnimation {
-                            duration: 180
-                            easing.type: Easing.OutCubic
-                        }
-                    }
-
-                    Behavior on y {
-                        NumberAnimation {
-                            duration: 180
-                            easing.type: Easing.OutCubic
-                        }
-                    }
+                    border.width: 2; border.color: root.activeBorderColor
+                    topLeftRadius: ci===0&&ri===0?root.largeWorkspaceRadius:root.smallWorkspaceRadius
+                    topRightRadius: ci===root.columns-1&&ri===0?root.largeWorkspaceRadius:root.smallWorkspaceRadius
+                    bottomLeftRadius: ci===0&&ri===root.rows-1?root.largeWorkspaceRadius:root.smallWorkspaceRadius
+                    bottomRightRadius: ci===root.columns-1&&ri===root.rows-1?root.largeWorkspaceRadius:root.smallWorkspaceRadius
+                    Behavior on x { NumberAnimation { duration:180; easing.type:Easing.OutCubic } }
+                    Behavior on y { NumberAnimation { duration:180; easing.type:Easing.OutCubic } }
                 }
             }
         }
